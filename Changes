@@ -1,0 +1,18 @@
+Revision history for Wx-Perl-ProcessStream
+
+0.07    2007-03-31 03:00
+        Added 'Set/Get Interval
+        updated documentation
+        first uploaded CPAN version
+
+0.06    2007-03-27 08:00
+        fixed failing tests on *nix
+        
+0.05    2007-03-27 06:00
+        Second pre-release version
+        Reworked interface
+        Added Tests
+
+0.01    2007-03-25 17:00
+        First pre-release version
+
