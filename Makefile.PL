@@ -5,6 +5,7 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     NAME                => 'Wx::Perl::ProcessStream',
     AUTHOR              => 'Mark Dootson <mdootson@cpan.org>',
+    ABSTRACT_FROM       => 'lib/Wx/Perl/ProcessStream.pm',
     VERSION_FROM        => 'lib/Wx/Perl/ProcessStream.pm',
     PL_FILES            => {},
     PREREQ_PM           => { Wx => 0.50,},

@@ -11,15 +11,15 @@
 
 package Wx::Perl::ProcessStream;
 # for pod
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 =head1 NAME
 
-Wx::Perl::ProcessStream
+Wx::Perl::ProcessStream - access IO of external processes via events
 
 =head1 VERSION
 
-Version 0.07
+Version 0.08
 
 =head1 SYNOPSYS
 
@@ -285,6 +285,10 @@ Copyright (C) 2007 Mark Dootson, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
+
+=head1 ACKNOWLEDGEMENTS
+
+Thanks to Johan Vromans for testing and suggesting a better interface.
 
 =head1 AUTHOR
 
