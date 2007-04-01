@@ -11,7 +11,7 @@
 
 package Wx::Perl::ProcessStream;
 # for pod
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 =head1 NAME
 
@@ -19,7 +19,7 @@ Wx::Perl::ProcessStream - access IO of external processes via events
 
 =head1 VERSION
 
-Version 0.08
+Version 0.09
 
 =head1 SYNOPSYS
 
@@ -335,7 +335,7 @@ use Wx::Perl::Carp;
 #-----------------------------------------------------
 # check wxWidgets version
 #-----------------------------------------------------
-if( Wx::wxVERSION() < 2.006003) {
+if( Wx::wxVERSION() lt '2.006003') {
     croak qq(Wx $Wx::VERSION compiled with $Wx::wxVERSION_STRING.\n\nMinimum wxWidgets version 2.6.3 required for Wx::Perl::ProcessStream $VERSION);
 }
 

@@ -1,5 +1,9 @@
 Revision history for Wx-Perl-ProcessStream
 
+0.09    2007-04-01 16:40
+        wxWidgets version check fixed
+        (thanks to Johan Vromans)
+
 0.08    2007-03-31 04:00
         Documentation Errors.
 

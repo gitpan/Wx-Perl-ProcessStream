@@ -19,7 +19,7 @@ sub OnInit {
     #----------------------------------------------------------------------
     # some non specific initialisation
     #----------------------------------------------------------------------
-        
+
     Wx::InitAllImageHandlers;
     
     #----------------------------------------------------------------------
@@ -38,7 +38,6 @@ sub OnInit {
     $self->SetTopWindow($mwin);
     $mwin->Centre;
     $mwin->Show(1);
-    
     
     return 1;  
     
@@ -76,8 +75,8 @@ sub new {
     $_[3] = wxTheApp->GetAppName() if not exists $_[3];      # title
     $_[4] = wxDefaultPosition      if not exists $_[4];      # position
     $_[5] = wxDefaultSize          if not exists $_[5];      # size
-    $_[6] = wxDEFAULT_FRAME_STYLE  if not exists $_[6];      # style
-    
+    $_[6] = wxDEFAULT_FRAME_STYLE if not exists $_[6];      # style
+   
     my $self = shift->SUPER::new(@_);
     
     $self->{menuindex} = {};
