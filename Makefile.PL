@@ -11,6 +11,6 @@ WriteMakefile(
     PREREQ_PM           => { Wx => 0.50,},
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean               => { FILES => 'Wx-Perl-ProcessStream-*' },
-    #EXE_FILES           => ['bin/wxpdk', 'bin/wxpar'],
+    
 );
 

@@ -3,15 +3,15 @@
 ## Purpose:     capture async process STDOUT/STDERR
 ## Author:      Mark Dootson
 ## Modified by:
-## Created:     25/03/2007
+## Created:     11/05/2007
 ## Copyright:   (c) 2007 Mark Dootson
 ## Licence:     This program is free software; you can redistribute it and/or
 ##              modify it under the same terms as Perl itself
 #############################################################################
 
 package Wx::Perl::ProcessStream;
-# for pod
-our $VERSION = '0.09';
+
+our $VERSION = '0.10';
 
 =head1 NAME
 
@@ -19,7 +19,7 @@ Wx::Perl::ProcessStream - access IO of external processes via events
 
 =head1 VERSION
 
-Version 0.09
+Version 0.10
 
 =head1 SYNOPSYS
 
@@ -335,7 +335,7 @@ use Wx::Perl::Carp;
 #-----------------------------------------------------
 # check wxWidgets version
 #-----------------------------------------------------
-if( Wx::wxVERSION() lt '2.006003') {
+if( Wx::wxVERSION() < 2.0060025) {
     croak qq(Wx $Wx::VERSION compiled with $Wx::wxVERSION_STRING.\n\nMinimum wxWidgets version 2.6.3 required for Wx::Perl::ProcessStream $VERSION);
 }
 
@@ -493,7 +493,7 @@ sub Notify {
             my $linedataread = 0;
             
             # STDERR
-            if( $process->IsErrorAvailable() && defined( my $linebuffer = readline( $process->GetErrorStream() ) ) ){
+            if( my $linebuffer = $process->__read_error_line ){
                 $linedataread = 1;
                 $blockreadlines++;
                 $linebuffer =~ s/(\r\n|\n)$//;
@@ -505,7 +505,7 @@ sub Notify {
             }
             
             # STDOUT
-            if( $process->IsInputAvailable() && defined( my $linebuffer = readline( $process->GetInputStream() ) ) ){
+            if( my $linebuffer = $process->__read_input_line ){
                 $linedataread = 1;
                 $blockreadlines++;
                 $linebuffer =~ s/(\r\n|\n)$//;
@@ -609,6 +609,38 @@ sub new {
     $self->{_stderr_buffer} = [];
     $self->{_stdout_buffer} = [];
     return $self;
+}
+
+sub __read_input_line {
+    my $self = shift;
+    my $linebuffer;
+    my $charsread = 0;
+    my $charbuffer = '0';
+    use bytes;
+    while($self->IsInputAvailable() && ( my $chars = read($self->GetInputStream(),$charbuffer,1 ) ) ) {
+        last if(!$chars);
+        $charsread ++;
+        $linebuffer .= $charbuffer;
+        last if($charbuffer eq "\n");
+    }
+    no bytes;
+    return $linebuffer;
+}
+
+sub __read_error_line {
+    my $self = shift;
+    my $linebuffer;
+    my $charsread = 0;
+    my $charbuffer = '0';
+    use bytes;
+    while($self->IsErrorAvailable() && ( my $chars = read($self->GetErrorStream(),$charbuffer,1 ) ) ) {
+        last if(!$chars);
+        $charsread ++;
+        $linebuffer .= $charbuffer;
+        last if($charbuffer eq "\n");
+    }
+    no bytes;
+    return $linebuffer;
 }
 
 sub OnTerminate {
