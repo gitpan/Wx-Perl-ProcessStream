@@ -11,7 +11,7 @@
 
 package Wx::Perl::ProcessStream;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 =head1 NAME
 
@@ -19,7 +19,7 @@ Wx::Perl::ProcessStream - access IO of external processes via events
 
 =head1 VERSION
 
-Version 0.10
+Version 0.11
 
 =head1 SYNOPSYS
 
@@ -34,6 +34,7 @@ Version 0.10
     my $proc2 = Wx::Perl::ProcessStream->OpenProcess($command, 'MyName2', $self);
     my @args = qw( executable.exe parm1 parm2 parm3 );
     my $proc3 = Wx::Perl::ProcessStream->OpenProcess(\@args, 'MyName2', $self);
+    my $proc4 = Wx::Perl::ProcessStream->OpenProcess(\@args, 'MyName2', $self, 'readline');
         
     sub evt_process_stdout {
         my ($self, $event) = @_;
@@ -86,13 +87,19 @@ Run an external process.
 If the process is launched successfully, returns a Wx::Perl::ProcessStream::Process object.
 If the process could not be launched, returns undef;
 
-    my $process = Wx::Perl::ProcessStream->OpenProcess($command, $name, $eventhandler);
+    my $process = Wx::Perl::ProcessStream->OpenProcess($command, $name, $eventhandler, $readmethod);
 
     $command      = command text (and parameters) you wish to run. You may also pass a
                     reference to an array containing the command and parameters.
     $name         = an arbitray name for the process.
     $eventhandler = the Wx object that will handle events for this process.
     $process      = Wx::Perl::ProcessStream::Process object
+    $readmethod   = 'getc' or 'readline' (default = 'getc') an optional param. From Wx version
+                    0.75 you can specifiy the method you wish to use to read the output of an
+                    external process. The default is 'getc' which uses the Wx::InputStream->GetC method
+                    to read bytes. If you specify 'readline', then the wxPerl implementation of
+                    Wx::InputStream->READLINE() will be used. From Wx version 0.75 onwards there should
+                    be no difference between output from the two implementations.
 
 If the process could not be started then zero is returned.
 You should destroy each process after it has completed. You can do this after receiving the exit event.
@@ -376,11 +383,12 @@ sub EVT_WXP_PROCESS_STREAM_EXIT ($$) { $_[0]->Connect(-1,-1,&wxpEVT_PROCESS_STRE
 
 sub OpenProcess {
     my $class = shift;
-    my( $command, $procname, $handler ) = @_;
+    my( $command, $procname, $handler, $readmethod ) = @_;
      
     $procname ||= 'any';
+    $readmethod ||= 'getc';
     
-    my $process = Wx::Perl::ProcessStream::Process->new( $procname, $handler );
+    my $process = Wx::Perl::ProcessStream::Process->new( $procname, $handler, $readmethod );
     $process->Redirect();
     $process->SetAppCloseAction($WXP_DEFAULT_CLOSE_ACTION);
     my $procid = (ref $command eq 'ARRAY') ? Wx::ExecuteArgs( $command, wxEXEC_ASYNC, $process )
@@ -424,6 +432,7 @@ sub SetPollInterval {
 package Wx::Perl::ProcessStream::ProcessHandler;
 use Wx qw( wxSIGTERM wxSIGKILL);
 use base qw( Wx::Timer );
+use Wx::Perl::Carp;
 
 sub DESTROY {
     my $self = shift;
@@ -597,12 +606,20 @@ use Wx qw(wxSIGTERM
           wxKILL_ERROR);
 
 use base qw( Wx::Process );
+use Wx::Perl::Carp;
 
 sub new {
     my $class = shift;
     my $procname = shift;
     my $handler = shift;
+    my $readmethod = shift || 'getc';
     my $self = $class->SUPER::new(@_);
+    
+    $self->{__readlinemethod} = ( lc($readmethod) eq 'readline' ) ? 1 : 0;
+    if($self->{__readlinemethod} && ($Wx::VERSION < 0.75)) {
+        carp('A read method of "readline" cannot be used with Wx versions < 0.75. Reverting to default "getc" method');
+    }
+    
     $self->__set_process_name($procname);
     $self->__set_handler($handler);
     $self->{_await_actions} = [];
@@ -614,14 +631,18 @@ sub new {
 sub __read_input_line {
     my $self = shift;
     my $linebuffer;
-    my $charsread = 0;
     my $charbuffer = '0';
     use bytes;
-    while($self->IsInputAvailable() && ( my $chars = read($self->GetInputStream(),$charbuffer,1 ) ) ) {
-        last if(!$chars);
-        $charsread ++;
-        $linebuffer .= $charbuffer;
-        last if($charbuffer eq "\n");
+    if($self->{__readlinebytes}) {
+         if( $self->IsInputAvailable() && defined( my $tempbuffer = readline( $self->GetInputStream() ) ) ){
+            $linebuffer = $tempbuffer;
+         }        
+    } else {
+        while($self->IsInputAvailable() && ( my $chars = read($self->GetInputStream(),$charbuffer,1 ) ) ) {
+            last if(!$chars);
+            $linebuffer .= $charbuffer;
+            last if($charbuffer eq "\n");
+        }
     }
     no bytes;
     return $linebuffer;
@@ -630,14 +651,18 @@ sub __read_input_line {
 sub __read_error_line {
     my $self = shift;
     my $linebuffer;
-    my $charsread = 0;
     my $charbuffer = '0';
     use bytes;
-    while($self->IsErrorAvailable() && ( my $chars = read($self->GetErrorStream(),$charbuffer,1 ) ) ) {
-        last if(!$chars);
-        $charsread ++;
-        $linebuffer .= $charbuffer;
-        last if($charbuffer eq "\n");
+    if($self->{__readlinebytes}) {
+         if( $self->IsErrorAvailable() && defined( my $tempbuffer = readline( $self->GetErrorStream() ) ) ){
+            $linebuffer = $tempbuffer;
+         }
+    } else {
+        while($self->IsErrorAvailable() && ( my $chars = read($self->GetErrorStream(),$charbuffer,1 ) ) ) {
+            last if(!$chars);
+            $linebuffer .= $charbuffer;
+            last if($charbuffer eq "\n");
+        }
     }
     no bytes;
     return $linebuffer;
