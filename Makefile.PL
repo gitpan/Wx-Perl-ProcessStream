@@ -1,5 +1,6 @@
 use strict;
 use warnings;
+use Archive::Tar;
 use ExtUtils::MakeMaker;
 
 my $build_requires = { 
@@ -7,7 +8,7 @@ my $build_requires = {
     'Time::HiRes'   => 1.20,
 };
 
-my $tarprog = ( $^O =~ /^mswin/i ) ? 'bsdtar' : 'tar';
+my $tarprog = 'tar';
 
 WriteMakefile(
     NAME                => 'Wx::Perl::ProcessStream',
@@ -16,8 +17,9 @@ WriteMakefile(
     VERSION_FROM        => 'lib/Wx/Perl/ProcessStream.pm',
     PL_FILES            => {},
     PREREQ_PM           => { %$build_requires },
-    dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', TAR => $tarprog },
+    dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', TAR => $tarprog, TARFLAGS => "cvf" },
     clean               => { FILES => 'Wx-Perl-ProcessStream-*' },
     
 );
+
 
