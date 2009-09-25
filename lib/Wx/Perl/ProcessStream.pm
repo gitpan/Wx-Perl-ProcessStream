@@ -11,7 +11,7 @@
 
 package Wx::Perl::ProcessStream;
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 =head1 NAME
 
@@ -19,7 +19,7 @@ Wx::Perl::ProcessStream - access IO of external processes via events
 
 =head1 VERSION
 
-Version 0.11
+Version 0.12
 
 =head1 SYNOPSYS
 
@@ -288,7 +288,7 @@ This returns the process that raised the event. If this is a wxpEVT_PROCESS_STRE
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright (C) 2007 Mark Dootson, all rights reserved.
+Copyright (C) 2007-2009 Mark Dootson, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
@@ -607,6 +607,7 @@ use Wx qw(wxSIGTERM
 
 use base qw( Wx::Process );
 use Wx::Perl::Carp;
+use Time::HiRes qw( sleep );
 
 sub new {
     my $class = shift;
@@ -625,6 +626,7 @@ sub new {
     $self->{_await_actions} = [];
     $self->{_stderr_buffer} = [];
     $self->{_stdout_buffer} = [];
+    $self->{_exitcode} = undef;
     return $self;
 }
 
@@ -761,7 +763,22 @@ sub CloseInput {
 sub IsAlive {
     my $self = shift;
     my $alive = Wx::Process::Kill( $self->GetProcessId(), wxSIGNONE );
-    if($alive == wxKILL_NO_PROCESS) {
+    
+    return 0 if $alive == wxKILL_NO_PROCESS;
+    
+    if( defined($self->{_exitcode}) ) {
+        # wait for a while to allow process to drop
+        my $maxwait = 10.0;       #seconds
+        my $interval = 0.1;       #seconds
+        while($maxwait > 0.0) {
+            $alive = Wx::Process::Kill( $self->GetProcessId(), wxSIGNONE );
+            last if $alive != wxKILL_OK;
+            $maxwait -= $interval;
+            sleep ( $interval ) if $maxwait > 0.0;
+        }
+    }
+    
+    if( $alive == wxKILL_NO_PROCESS ) {
         return 0;
     } elsif( $alive == wxKILL_OK ) {
         return 1;

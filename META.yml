@@ -1,11 +1,15 @@
-# http://module-build.sourceforge.net/META-spec.html
-#XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
-name:         Wx-Perl-ProcessStream
-version:      0.11
-version_from: lib/Wx/Perl/ProcessStream.pm
-installdirs:  site
-requires:
+--- #YAML:1.0
+name:                Wx-Perl-ProcessStream
+version:             0.12
+abstract:            access IO of external processes via events
+license:             ~
+author:              
+    - Mark Dootson <mdootson@cpan.org>
+generated_by:        ExtUtils::MakeMaker version 6.42_01
+distribution_type:   module
+requires:     
+    Time::HiRes:                   1.2
     Wx:                            0.5
-
-distribution_type: module
-generated_by: ExtUtils::MakeMaker version 6.30
+meta-spec:
+    url:     http://module-build.sourceforge.net/META-spec-v1.3.html
+    version: 1.3

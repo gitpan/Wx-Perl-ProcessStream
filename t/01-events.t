@@ -154,8 +154,6 @@ sub RunTests {
             $process->CloseInput();
         }
         Wx::wxTheApp->Yield();
-        
-        #sleep 1;
     }
     
     is( $process->IsAlive(), 0 );
@@ -176,10 +174,10 @@ sub RunTests {
 sub start_process {
     my ($self, $cmd) = @_;
     $self->{_stdout} = [];
-	$self->{_stderr} = [];
-	$self->{_exitcode} = undef;
-	my $process = Wx::Perl::ProcessStream->OpenProcess( $cmd, 'TestCmd', $self );
-	die 'Failed to launch process' if(!$process);
+    $self->{_stderr} = [];
+    $self->{_exitcode} = undef;
+    my $process = Wx::Perl::ProcessStream->OpenProcess( $cmd, 'TestCmd', $self );
+    die 'Failed to launch process' if(!$process);
     return $process;
 }
     
@@ -187,7 +185,6 @@ sub wait_for_test_complete {
 	my $self = shift;
 	while(!defined($self->{_exitcode})) {
 		Wx::wxTheApp->Yield();
-		#sleep 1;
 	}
 }
 

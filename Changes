@@ -1,5 +1,9 @@
 Revision history for Wx-Perl-ProcessStream
 
+0.12    2009-06-25 00:00
+        Fixed timing issue with Vista / Win7 
+        ( CPAN RT 44795 et al )
+
 0.11    2007-06-21 06:00
         Option added to use Wx::InputStream::READLINE
         for reading process output.
