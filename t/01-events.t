@@ -13,7 +13,7 @@ $app->MainLoop;
 
 package ProcessStreamTestingFrame;
 use base qw(WxTesting::Frame);
-use Wx::Perl::ProcessStream 0.16 qw( :everything );
+use Wx::Perl::ProcessStream 0.17 qw( :everything );
 use Test::More;
 
 

@@ -1,5 +1,8 @@
 Revision history for Wx-Perl-ProcessStream
 
+0.17    2009-06-26 00:00
+        Should now run multiple side by side processes OK
+
 0.16    2009-06-26 00:00
         Added new, Run and GetPid methods to process
         updated pod

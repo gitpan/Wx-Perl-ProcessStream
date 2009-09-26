@@ -11,7 +11,7 @@
 
 package Wx::Perl::ProcessStream;
 
-our $VERSION = '0.16';
+our $VERSION = '0.17';
 
 =head1 NAME
 
@@ -19,7 +19,7 @@ Wx::Perl::ProcessStream - access IO of external processes via events
 
 =head1 VERSION
 
-Version 0.16
+Version 0.17
 
 =head1 SYNOPSYS
 
@@ -651,11 +651,16 @@ use Wx 0.50 qw(
     wxKILL_NO_PROCESS
     wxKILL_ERROR
     wxEXEC_ASYNC
+    wxID_ANY
+    wxTheApp
     );
 
 use base qw( Wx::Process );
 use Wx::Perl::Carp;
 use Time::HiRes qw( sleep );
+
+our $_runningpids = {};
+our $_eventhandler = Wx::Perl::ProcessStream::ProcEvtHandler->new();
 
 sub new {
     my ($class, $command, $procname, $handler, $readmethod) = @_;
@@ -663,7 +668,7 @@ sub new {
     $procname   ||= 'any';
     $readmethod ||= ($Wx::VERSION > 0.74) ? 'readline' : 'getc';
     
-    my $self = $class->SUPER::new();
+    my $self = $class->SUPER::new($_eventhandler);
     
     $self->Redirect();
     $self->SetAppCloseAction($WXP_DEFAULT_CLOSE_ACTION);
@@ -682,7 +687,6 @@ sub new {
     $self->{_await_actions} = [];
     $self->{_stderr_buffer} = [];
     $self->{_stdout_buffer} = [];
-    $self->{_exitcode} = undef;
     $self->{_arg_command} = $command;
     
     return $self;
@@ -746,11 +750,6 @@ sub __read_error_line {
     return $linebuffer;
 }
 
-sub OnTerminate {
-    my($self, $pid, $status) = @_;
-    $self->__set_exit_code($status);   
-}
-
 sub __get_handler {
     my $self = shift;
     return $self->{_handler};
@@ -784,13 +783,13 @@ sub __set_process_name {
 
 sub GetExitCode {
     my $self = shift;
-    return $self->{_exitcode};
+    my $pid = $self->GetPid;
+    if(!defined($self->{_stored_exit_code})) {
+        $self->{_stored_exit_code} = $_runningpids->{$pid};
+    }
+    return $self->{_stored_exit_code};
 }
 
-sub __set_exit_code {
-    my $self = shift;
-    $self->{_exitcode} = shift;
-}
 
 sub GetStdOutBuffer {
     my $self = shift;
@@ -841,16 +840,17 @@ sub CloseInput {
 sub IsAlive {
     my $self = shift;
     my $alive = Wx::Process::Kill( $self->GetProcessId(), wxSIGNONE );
-    
     return 0 if $alive == wxKILL_NO_PROCESS;
     
-    if( defined($self->{_exitcode}) ) {
+    if( defined($self->GetExitCode) ) {
         # wait for a while to allow process to drop
         my $maxwait = 10.0;       #seconds
         my $interval = 0.1;       #seconds
         while($maxwait > 0.0) {
+            
             $alive = Wx::Process::Kill( $self->GetProcessId(), wxSIGNONE );
             last if $alive != wxKILL_OK;
+            
             $maxwait -= $interval;
             sleep ( $interval ) if $maxwait > 0.0;
         }
@@ -867,6 +867,9 @@ sub IsAlive {
 
 sub Destroy {
     my $self = shift;
+    Wx::Process::Kill($self->GetPid(), wxSIGKILL) if $self->IsAlive; # this will force us to wait for exit if we have received exit event
+    my $pid = $self->GetPid;
+    delete($_runningpids->{$pid});
     $self->SUPER::Destroy;
 }
 
@@ -920,6 +923,31 @@ sub Clone {
     $clone->SetProcess( $self->GetProcess );
     return $clone;
 }
+
+
+package Wx::Perl::ProcessStream::ProcEvtHandler;
+use Wx 0.50 qw( wxID_ANY );
+use base qw( Wx::Process );
+use Wx::Event qw(EVT_END_PROCESS);
+
+sub new {
+    my ($class, @args) = @_;
+    
+    my $self = $class->SUPER::new(@args);
+    
+    EVT_END_PROCESS($self, wxID_ANY, sub { shift->OnEventEndProcess(@_); });
+    
+    return $self;
+}
+
+sub OnEventEndProcess {
+    my ($self, $event) = @_;
+    $event->Skip(0);
+    my $pid = $event->GetPid;
+    my $exitcode = $event->GetExitCode;
+    $_runningpids->{$pid} = $exitcode;
+}
+
 
 1;
 __END__
