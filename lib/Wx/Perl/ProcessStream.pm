@@ -4,14 +4,14 @@
 ## Author:      Mark Dootson
 ## Modified by:
 ## Created:     11/05/2007
-## Copyright:   (c) 2007 Mark Dootson
+## Copyright:   (c) 2007-2009 Mark Dootson
 ## Licence:     This program is free software; you can redistribute it and/or
 ##              modify it under the same terms as Perl itself
 #############################################################################
 
 package Wx::Perl::ProcessStream;
 
-our $VERSION = '0.14';
+our $VERSION = '0.16';
 
 =head1 NAME
 
@@ -19,7 +19,7 @@ Wx::Perl::ProcessStream - access IO of external processes via events
 
 =head1 VERSION
 
-Version 0.14
+Version 0.16
 
 =head1 SYNOPSYS
 
@@ -27,14 +27,20 @@ Version 0.14
     
     EVT_WXP_PROCESS_STREAM_STDOUT( $self, \&evt_process_stdout);
     EVT_WXP_PROCESS_STREAM_STDERR( $self, \&evt_process_stderr);
-    EVT_WXP_PROCESS_STREAM_EXIT( $self, \&evt_process_exit);
+    EVT_WXP_PROCESS_STREAM_EXIT  ( $self, \&evt_process_exit  );
     
-    my $proc1 = Wx::Perl::ProcessStream->OpenProcess('perl -e"print qq($_\n) for(@INC);"', 'MyName1', $self);
+    my $proc1 = Wx::Perl::ProcessStream::Process->new('perl -e"print qq($_\n) for(@INC);"', 'MyName1', $self);
+    $proc1->Run;
+    
     my $command = 'executable.exe parm1 parm2 parm3'
-    my $proc2 = Wx::Perl::ProcessStream->OpenProcess($command, 'MyName2', $self);
+    my $proc2 = Wx::Perl::ProcessStream::Process->new($command, 'MyName2', $self)
+                                                ->Run;
+                                                
     my @args = qw( executable.exe parm1 parm2 parm3 );
-    my $proc3 = Wx::Perl::ProcessStream->OpenProcess(\@args, 'MyName2', $self);
-    my $proc4 = Wx::Perl::ProcessStream->OpenProcess(\@args, 'MyName2', $self, 'readline');
+    my $proc3 = Wx::Perl::ProcessStream::Process->new(\@args, 'MyName2', $self);
+    $proc3->Run;
+    
+    my $proc4 = Wx::Perl::ProcessStream::Process->new(\@args, 'MyName2', $self, 'readline')->Run;
         
     sub evt_process_stdout {
         my ($self, $event) = @_;
@@ -48,6 +54,19 @@ Version 0.14
             $process->CloseInput() if($finishedwriting);
         }
         ............
+        # To Clear Buffer
+        my @buffers = @{ $process->GetStdOutBuffer };
+        
+    }
+    
+    sub evt_process_stderr {
+        my ($self, $event) = @_;
+        $event->Skip(1);
+        my $process = $event->GetProcess;
+        my $line = $event->GetLine;
+        print STDERR qq($line\n);
+        # To Clear Buffer
+        my @errors = @{ $process->GetStdErrBuffer };
     }
     
     sub evt_process_exit {
@@ -56,7 +75,7 @@ Version 0.14
         my $process = $event->GetProcess;
         my $line = $event->GetLine;
         my @buffers = @{ $process->GetStdOutBuffer };
-        my @errors = @{ $process->GetStdOutBuffer };
+        my @errors = @{ $process->GetStdErrBuffer };
         my $exitcode = $process->GetExitCode;
         ............
         $process->Destroy;
@@ -73,87 +92,38 @@ Do not use this module simply to collect the output of another process. For that
     my ($status, $output) = Wx::ExecuteStdout( 'perl -e"print qq($_\n) for(@INC);"' );
 
 
-=head2 Wx::Perl::ProcessStream
-
+=head2 Wx::Perl::ProcessStream::Process
 
 =head3 Methods
 
-
 =over 12
 
-=item OpenProcess
+=item new
 
-Run an external process.
-If the process is launched successfully, returns a Wx::Perl::ProcessStream::Process object.
-If the process could not be launched, returns undef;
+Create a new Wx::Perl::ProcessStream::Process object. You must then use the Run method to execute
+your command.
 
-    my $process = Wx::Perl::ProcessStream->OpenProcess($command, $name, $eventhandler, $readmethod);
+    my $process = Wx::Perl::ProcessStream::Process->new($command, $name, $eventhandler, $readmethod);
 
     $command      = command text (and parameters) you wish to run. You may also pass a
                     reference to an array containing the command and parameters.
     $name         = an arbitray name for the process.
-    $eventhandler = the Wx object that will handle events for this process.
-    $process      = Wx::Perl::ProcessStream::Process object
-    $readmethod   = 'getc' or 'readline' (default = 'getc') an optional param. From Wx version
+    $eventhandler = the Wx EventHandler (Wx:Window) that will handle events for this process.
+    $readmethod   = 'getc' or 'readline' (default = 'readline') an optional param. From Wx version
                     0.75 you can specifiy the method you wish to use to read the output of an
-                    external process. The default is 'getc' which uses the Wx::InputStream->GetC method
-                    to read bytes. If you specify 'readline', then the wxPerl implementation of
-                    Wx::InputStream->READLINE() will be used. From Wx version 0.75 onwards there should
-                    be no difference between output from the two implementations.
+                    external process.
+                    The default depends on your Wx version ( 'getc' < 0.75,'readline' >= 0.75) 
+                    getc       -- uses the Wx::InputStream->GetC method to read bytes. 
+                    readline   -- uses the wxPerl implementation of Wx::InputStream->READLINE.
 
-If the process could not be started then zero is returned.
-You should destroy each process after it has completed. You can do this after receiving the exit event.
+=item Run
 
+Run the process with the parameters passed to new. On success, returns the process object itself.
+This allows you to do: my $process = Wx::Perl::ProcessStream->new($command, $name, $self)->Run;
+Returns undef if the process could not be started.
 
-=item GetDefaultAppCloseAction
-
-Returns the default on application close action that will be given to new processes.
-When your application exits, any remaining Wx::Perl::ProcessStream::Process objects will be signalled to close.
-The default signal is wxpSIGTERM but you can change this to wxpSIGKILL if you are sure this is what you want.
-Whenever a mew process is opened, it is given the application close action returned by GetDefaultAppCloseAction.
-You can also set the application close action at an individual process level.
-
-    my $def-action = Wx::Perl::ProcessStream->SetDefaultAppCloseAction();
-
-    $def-action will be one of wxpSIGTERM or wxpSIGKILL; (default wxpSIGTERM)
-
-
-=item SetDefaultAppCloseAction
-
-Sets the default on application close action that will be given to new processes.
-See GetDefaultAppCloseAction.
-
-    Wx::Perl::ProcessStream->SetDefaultAppCloseAction( $newdefaction );
-
-    $newdefaction = one of wxpSIGTERM or wxpSIGKILL
-
-=item GetPollInterval
-
-Get the current polling interval. See SetPollInterval.
-
-    $milliseconds = Wx::Perl::ProcessStream->GetPollInterval();
-
-=item SetPollInterval
-
-When all buffers are empty but there are still running external process, the module will pause before polling the processes again for output.
-By default, the module waits for 500 milliseconds. You can set the value of this polling intrval with this method.
-Internally, a Wx::Timer object is used to handle polling and the value you set here is passed directly to that.
-The precision of the intervals is OS dependent.
-
-    Wx::Perl::ProcessStream->SetPollInterval( $milliseconds );
-
-    $milliseconds = number of milliseconds to wait when no buffer activity
-
-=back
-
-=head2 Wx::Perl::ProcessStream::Process
-
-Returned from a call to Wx::Perl::ProcessStream->OpenProcess.
-It is also available in event handlers using $event->GetProcess.
-
-=head3 Methods
-
-=over 12
+    my $process = Wx::Perl::ProcessStream::Process->new($command, $name, $eventhandler, $readmethod);
+    $process->Run;    
 
 =item CloseInput
 
@@ -202,10 +172,19 @@ Returns the process id assigned by the system.
 
     my $processid = $process->GetProcessId();
 
+=item GetPid
+
+Returns the process id assigned by the system.
+
+    my $processid = $process->GetPid();
+
 =item IsAlive
 
 Check if the process still exists in the system.
-Returns 1 if process exists, 0 if process does not exist, and undefined if there was some problem in signaling the process. 
+Returns 1 if process exists, 0 if process does not exist, and undefined if there was some problem 
+in signaling the process. If the process has already signalled its exit, the IsAlive method will
+wait until the system recogises the process exit before returning. Therefore IsAlive should 
+always return 0 (false) once a EVT_WXP_PROCESS_STREAM_EXIT event has been received.
 
     my $isalive = $process->IsAlive();
 
@@ -237,6 +216,79 @@ Write to the STDIN of process.
     $process->WriteProcess( $writedata . "\n" );
 
     $writedata = The data you wish to write. Remember to add any appropriate line endings your external process may expect.
+
+=back
+
+=head2 Wx::Perl::ProcessStream
+
+
+=head3 Methods
+
+
+=over 12
+
+=item OpenProcess
+
+Run an external process. DEPRECATED - use Wx::Perl::ProcessStream::Process->new()->Run;
+If the process is launched successfully, returns a Wx::Perl::ProcessStream::Process object.
+If the process could not be launched, returns undef;
+
+    my $process = Wx::Perl::ProcessStream->OpenProcess($command, $name, $eventhandler, $readmethod);
+
+    $command      = command text (and parameters) you wish to run. You may also pass a
+                    reference to an array containing the command and parameters.
+    $name         = an arbitray name for the process.
+    $eventhandler = the Wx object that will handle events for this process.
+    $process      = Wx::Perl::ProcessStream::Process object
+    $readmethod   = 'getc' or 'readline' (default = 'readline') an optional param. From Wx version
+                    0.75 you can specifiy the method you wish to use to read the output of an
+                    external process. The default depends on your Wx version ( 'getc' < 0.75, 
+                    'readline' >= 0.75) 
+                    'getc' uses the Wx::InputStream->GetC method to read bytes. 
+                    'readline', uses the wxPerl implementation of Wx::InputStream->READLINE.
+
+If the process could not be started then zero is returned.
+You should destroy each process after it has completed. You can do this after receiving the exit event.
+
+
+=item GetDefaultAppCloseAction
+
+Returns the default on application close action that will be given to new processes.
+When your application exits, any remaining Wx::Perl::ProcessStream::Process objects will be signalled to close.
+The default signal is wxpSIGTERM but you can change this to wxpSIGKILL if you are sure this is what you want.
+Whenever a mew process is opened, it is given the application close action returned by GetDefaultAppCloseAction.
+You can also set the application close action at an individual process level.
+
+    my $def-action = Wx::Perl::ProcessStream->SetDefaultAppCloseAction();
+
+    $def-action will be one of wxpSIGTERM or wxpSIGKILL; (default wxpSIGTERM)
+
+
+=item SetDefaultAppCloseAction
+
+Sets the default on application close action that will be given to new processes.
+See GetDefaultAppCloseAction.
+
+    Wx::Perl::ProcessStream->SetDefaultAppCloseAction( $newdefaction );
+
+    $newdefaction = one of wxpSIGTERM or wxpSIGKILL
+
+=item GetPollInterval
+
+Get the current polling interval. See SetPollInterval.
+
+    $milliseconds = Wx::Perl::ProcessStream->GetPollInterval();
+
+=item SetPollInterval
+
+When all buffers are empty but there are still running external process, the module will pause before polling the processes again for output.
+By default, the module waits for 500 milliseconds. You can set the value of this polling intrval with this method.
+Internally, a Wx::Timer object is used to handle polling and the value you set here is passed directly to that.
+The precision of the intervals is OS dependent.
+
+    Wx::Perl::ProcessStream->SetPollInterval( $milliseconds );
+
+    $milliseconds = number of milliseconds to wait when no buffer activity
 
 =back
 
@@ -350,11 +402,12 @@ if( Wx::wxVERSION() < 2.0060025) {
 # initialise
 #-----------------------------------------------------
 
-our ($ID_CMD_EXIT, $ID_CMD_STDOUT, $ID_CMD_STDERR, $WXP_DEFAULT_CLOSE_ACTION);
+our ($ID_CMD_EXIT, $ID_CMD_STDOUT, $ID_CMD_STDERR, $WXP_DEFAULT_CLOSE_ACTION, $WXPDEBUG);
 
-$ID_CMD_EXIT = Wx::NewId();
-$ID_CMD_STDOUT = Wx::NewId();
-$ID_CMD_STDERR = Wx::NewId();
+$ID_CMD_EXIT   = Wx::NewEventType();
+$ID_CMD_STDOUT = Wx::NewEventType();
+$ID_CMD_STDERR = Wx::NewEventType();
+
 $WXP_DEFAULT_CLOSE_ACTION = wxSIGTERM;
 
 our @EXPORT_OK = qw( wxpEVT_PROCESS_STREAM_EXIT
@@ -366,12 +419,15 @@ our @EXPORT_OK = qw( wxpEVT_PROCESS_STREAM_EXIT
                      wxpSIGTERM
                      wxpSIGKILL
                     );
+                    
 our %EXPORT_TAGS = ();
+
 $EXPORT_TAGS{'everything'} = \@EXPORT_OK;
+$EXPORT_TAGS{'all'} = \@EXPORT_OK;
 
 our $ProcHandler = Wx::Perl::ProcessStream::ProcessHandler->new();
 
-sub wxpEVT_PROCESS_STREAM_EXIT () { $ID_CMD_EXIT }
+sub wxpEVT_PROCESS_STREAM_EXIT   () { $ID_CMD_EXIT }
 sub wxpEVT_PROCESS_STREAM_STDERR () { $ID_CMD_STDERR }
 sub wxpEVT_PROCESS_STREAM_STDOUT () { $ID_CMD_STDOUT }
 sub wxpSIGTERM () { wxSIGTERM }
@@ -379,27 +435,15 @@ sub wxpSIGKILL () { wxSIGKILL }
 
 sub EVT_WXP_PROCESS_STREAM_STDOUT ($$) { $_[0]->Connect(-1,-1,&wxpEVT_PROCESS_STREAM_STDOUT, $_[1] ) };
 sub EVT_WXP_PROCESS_STREAM_STDERR ($$) { $_[0]->Connect(-1,-1,&wxpEVT_PROCESS_STREAM_STDERR, $_[1] ) };
-sub EVT_WXP_PROCESS_STREAM_EXIT ($$) { $_[0]->Connect(-1,-1,&wxpEVT_PROCESS_STREAM_EXIT, $_[1] ) };
+sub EVT_WXP_PROCESS_STREAM_EXIT   ($$) { $_[0]->Connect(-1,-1,&wxpEVT_PROCESS_STREAM_EXIT,   $_[1] ) };
+
+# Old interface - call Wx::Perl::ProcessStream::new
 
 sub OpenProcess {
     my $class = shift;
     my( $command, $procname, $handler, $readmethod ) = @_;
-     
-    $procname ||= 'any';
-    $readmethod ||= 'getc';
-    
-    my $process = Wx::Perl::ProcessStream::Process->new( $procname, $handler, $readmethod );
-    $process->Redirect();
-    $process->SetAppCloseAction($WXP_DEFAULT_CLOSE_ACTION);
-    my $procid = (ref $command eq 'ARRAY') ? Wx::ExecuteArgs( $command, wxEXEC_ASYNC, $process )
-                                           : Wx::ExecuteCommand( $command, wxEXEC_ASYNC, $process );
-    if($procid) {
-        $process->__set_process_id( $procid );
-        $ProcHandler->AddProc( $process );
-        return $process;
-    } else {
-        return undef;
-    }
+    my $process = Wx::Perl::ProcessStream::Process->new( $command, $procname, $handler, $readmethod );
+    return ( $process->Run ) ? $process : undef;
 }
 
 sub SetDefaultAppCloseAction {
@@ -546,6 +590,7 @@ sub Notify {
             $self->{_procs} = [];
             $procsadded = 1
         }
+        
         @checkprocs = @procsleft;
         
         # loop if we have new procs or read data
@@ -596,30 +641,41 @@ sub AddProc {
 #-----------------------------------------------------
 
 package Wx::Perl::ProcessStream::Process;
-use Wx qw(wxSIGTERM
-          wxSIGKILL
-          wxSIGNONE
-          wxKILL_OK
-          wxKILL_BAD_SIGNAL
-          wxKILL_ACCESS_DENIED
-          wxKILL_NO_PROCESS
-          wxKILL_ERROR);
+use Wx 0.50 qw(
+    wxSIGTERM
+    wxSIGKILL
+    wxSIGNONE
+    wxKILL_OK
+    wxKILL_BAD_SIGNAL
+    wxKILL_ACCESS_DENIED
+    wxKILL_NO_PROCESS
+    wxKILL_ERROR
+    wxEXEC_ASYNC
+    );
 
 use base qw( Wx::Process );
 use Wx::Perl::Carp;
 use Time::HiRes qw( sleep );
 
 sub new {
-    my $class = shift;
-    my $procname = shift;
-    my $handler = shift;
-    my $readmethod = shift || 'getc';
-    my $self = $class->SUPER::new(@_);
+    my ($class, $command, $procname, $handler, $readmethod) = @_;
+    
+    $procname   ||= 'any';
+    $readmethod ||= ($Wx::VERSION > 0.74) ? 'readline' : 'getc';
+    
+    my $self = $class->SUPER::new();
+    
+    $self->Redirect();
+    $self->SetAppCloseAction($WXP_DEFAULT_CLOSE_ACTION);
     
     $self->{__readlinemethod} = ( lc($readmethod) eq 'readline' ) ? 1 : 0;
     if($self->{__readlinemethod} && ($Wx::VERSION < 0.75)) {
         carp('A read method of "readline" cannot be used with Wx versions < 0.75. Reverting to default "getc" method');
+        $readmethod = 'getc';
+        $self->{__readlinemethod} = 0;
     }
+    
+    print qq(read method is $readmethod\n) if($Wx::Perl::ProcessStream::WXPDEBUG);
     
     $self->__set_process_name($procname);
     $self->__set_handler($handler);
@@ -627,7 +683,27 @@ sub new {
     $self->{_stderr_buffer} = [];
     $self->{_stdout_buffer} = [];
     $self->{_exitcode} = undef;
+    $self->{_arg_command} = $command;
+    
     return $self;
+}
+
+sub Run {
+    my $self = shift;
+    
+    my $command = $self->{_arg_command};
+    
+    my $procid = (ref $command eq 'ARRAY') 
+        ? Wx::ExecuteArgs   ( $command, wxEXEC_ASYNC, $self )
+        : Wx::ExecuteCommand( $command, wxEXEC_ASYNC, $self );
+        
+    if($procid) {
+        $self->__set_process_id( $procid );
+        $Wx::Perl::ProcessStream::ProcHandler->AddProc( $self );
+        return $self;
+    } else {
+        return undef;
+    }
 }
 
 sub __read_input_line {
@@ -735,6 +811,8 @@ sub GetProcessId {
     return $self->{_processpid};
 }
 
+sub GetPid { shift->GetProcessId; }
+
 sub __set_process_id {
     my $self = shift;
     $self->{_processpid} = shift;
@@ -787,6 +865,17 @@ sub IsAlive {
     }
 }
 
+sub Destroy {
+    my $self = shift;
+    $self->SUPER::Destroy;
+}
+
+sub DESTROY {
+    my $self = shift;
+    print qq(DESTROY method for ) . $self->GetPid . qq(\n) if($Wx::Perl::ProcessStream::WXPDEBUG);
+    $self->SUPER::DESTROY if $self->can('SUPER::DESTROY');
+}
+
 #-----------------------------------------------------
 # PACKAGE Wx::Perl::ProcessStream::ProcessEvent
 #
@@ -828,7 +917,7 @@ sub Clone {
     my $class = ref $self;
     my $clone = $class->new( $self->GetEventType(), $self->GetId() );
     $clone->SetLine( $self->GetLine );
-    $clone->SetProcess( $self->GetProcess() );
+    $clone->SetProcess( $self->GetProcess );
     return $clone;
 }
 

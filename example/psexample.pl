@@ -221,7 +221,7 @@ sub evt_button_execute {
     my ($self, $event) = @_;
     $event->Skip(1);    # allow event to be processed by further handlers
     my $cmd = $self->get_control('TxtCommand')->GetValue();
-    my $process = Wx::Perl::ProcessStream->OpenProcess($cmd, 'Perl Version', $self);
+    my $process = Wx::Perl::ProcessStream::Process->new($cmd, 'Perl Version', $self)->Run;
 }
 
 sub evt_process_stdout {
