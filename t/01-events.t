@@ -1,9 +1,9 @@
 #!perl
-
+BEGIN { $ENV{WXPPS_MULTITEST} ||= 10; $ENV{WXPPS_POLLINTERVAL} ||= 100;}
 package main;
 
 use strict;
-use Test::More tests => 44;
+use Test::More tests => 45 + $ENV{WXPPS_MULTITEST};
 use lib 't';
 use Wx;
 use WxTesting qw( app_from_wxtesting_frame );
@@ -12,9 +12,11 @@ my $app = app_from_wxtesting_frame( 'ProcessStreamTestingFrame' );
 $app->MainLoop;
 
 package ProcessStreamTestingFrame;
+use strict;
 use base qw(WxTesting::Frame);
-use Wx::Perl::ProcessStream 0.17 qw( :everything );
+use Wx::Perl::ProcessStream 0.18 qw( :everything );
 use Test::More;
+use Time::HiRes qw( sleep );
 
 
 sub new {
@@ -26,6 +28,7 @@ sub new {
     $self->{_stdout} = [];
     $self->{_stderr} = [];
     $self->{_exitcode} = undef;
+    $self->{_eventmode} = 'single';
     return $self;
 }
 
@@ -34,7 +37,7 @@ sub RunTests {
     my $perl = $^X;
     
     # speed up tests
-    Wx::Perl::ProcessStream->SetPollInterval(100);
+    Wx::Perl::ProcessStream->SetPollInterval($ENV{WXPPS_POLLINTERVAL});
     
     # test group 1
     my $cmd;
@@ -200,6 +203,46 @@ sub RunTests {
     $process->Destroy;
     $process = undef;
     
+    # test group 6 - multiple instance
+    
+    my @multiprocs;
+    $self->{_eventmode} = 'multi';
+    
+    for (my $i = 0; $i < $ENV{WXPPS_MULTITEST}; $i ++) {
+        my $sleeptime =  1 + (int(rand(10))/ 10); # sleep between 1.1 and 1.9 seconds - we want instances to exit in random order
+        my $exitcode = 1 + int(rand(100)); # exitcodes 1 to 100
+        my $multicmd = 'perl -e"use Time::HiRes qw( sleep ); sleep ' . $sleeptime . '; print qq(GOODBYE WORLD FROM PID: $$ INSTANCE: ' . $i . '\n); exit(' . $exitcode . ');"';
+        my $multiprocess = $self->start_process_b( $multicmd );
+        my $multipid = $multiprocess->GetPid;
+        $self->{_multiresult}->{$multipid}->{expected} = $exitcode;
+        push(@multiprocs, $multiprocess);
+    }
+    # wait for all procs to end
+    {
+        my $stillrunning = 1;
+        while($stillrunning) {
+            $stillrunning = 0;
+            foreach my $mpid (sort keys( %{ $self->{_multiresult} } ) ) {
+                $stillrunning ++ if(!defined($self->{_multiresult}->{$mpid}->{received}));
+            }
+            Wx::wxTheApp->Yield();
+        }
+    }
+    for( @multiprocs ) {
+        $_->Destroy;
+    }
+    @multiprocs = ();
+    
+    foreach my $mpid (sort keys( %{ $self->{_multiresult} } ) ) {
+        my $mresult = $self->{_multiresult}->{$mpid};
+        ok( $mresult->{expected} > 0 && ($mresult->{expected} eq $mresult->{received}), 'check expected vs received exit code' ) or
+            diag(qq(PID $mpid expected : $self->{_multiresult}->{$mpid}->{expected} : received : $self->{_multiresult}->{$mpid}->{received}));
+    }
+    
+    # test group 7 - num procs should be zero
+    
+    is(Wx::Perl::ProcessStream::ProcessCount(), 0, 'check process count is zero');
+    
     return 1;
 }
 
@@ -256,7 +299,13 @@ sub evt_process {
     } elsif ( $evttype == wxpEVT_PROCESS_STREAM_STDERR) {
         push(@{ $self->{_stderr} }, $line);
     } elsif ( $evttype == wxpEVT_PROCESS_STREAM_EXIT) {
-        $self->{_exitcode} = $process->GetExitCode();
+        if( $self->{_eventmode} ne 'multi') {
+            $self->{_exitcode} = $process->GetExitCode();
+        } else {
+            my $pid = $process->GetPid();
+            my $exitcode = $process->GetExitCode();
+            $self->{_multiresult}->{$pid}->{received} = $exitcode;
+        }
     }
 }
 

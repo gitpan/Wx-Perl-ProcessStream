@@ -1,5 +1,9 @@
 Revision history for Wx-Perl-ProcessStream
 
+0.18    2009-06-27 00:00
+        Exit code error in 0.17 ; 
+        schoolboy error (use strict you fool!)
+
 0.17    2009-06-26 00:00
         Should now run multiple side by side processes OK
 

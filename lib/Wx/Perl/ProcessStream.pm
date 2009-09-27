@@ -11,7 +11,7 @@
 
 package Wx::Perl::ProcessStream;
 
-our $VERSION = '0.17';
+our $VERSION = '0.18';
 
 =head1 NAME
 
@@ -19,7 +19,7 @@ Wx::Perl::ProcessStream - access IO of external processes via events
 
 =head1 VERSION
 
-Version 0.17
+Version 0.18
 
 =head1 SYNOPSYS
 
@@ -464,6 +464,8 @@ sub SetPollInterval {
     my ($class, $interval) = @_;
     $ProcHandler->_set_poll_interval($interval);
 }
+
+sub ProcessCount { $ProcHandler->ProcessCount; }
     
 
 #-----------------------------------------------------
@@ -474,6 +476,7 @@ sub SetPollInterval {
 #-----------------------------------------------------
 
 package Wx::Perl::ProcessStream::ProcessHandler;
+use strict;
 use Wx qw( wxSIGTERM wxSIGKILL);
 use base qw( Wx::Timer );
 use Wx::Perl::Carp;
@@ -512,29 +515,32 @@ sub Notify {
     return 1 if($self->{_notify_in_progress}); # do not re-enter notify proc
     $self->{_notify_in_progress} = 1;
     
-    my @checkprocs = @{ $self->{_procs} };     # get the current list of procs
-    $self->{_procs} = [];                      # clear permanent list
+    my $continueprocessloop = 1;
     
-    my $continue = 1;
+    while( $continueprocessloop  ) {
     
-    my $oldpollinterval = $self->{_pollinterval}; # handle poll interval changes
-    
-    while( $continue ) {
-        my @procsleft = ();
-        my $blockreadlines = 0;
+        $continueprocessloop = 0;
+        
+        my @checkprocs = @{ $self->{_procs} };
+        
         for my $process (@checkprocs) {
             
             # process inout actions
             while( my $action = shift( @{ $process->{_await_actions} }) ) {
-               
+                
+                $continueprocessloop ++;
+                
                 if( $action->{action} eq 'terminate' ) {
                     $process->CloseOutput() if( defined(my $handle = $process->GetOutputStream() ) );
                     Wx::Process::Kill($process->GetProcessId(), wxSIGTERM);
+      
                 }elsif( $action->{action} eq 'kill' ) {
                     $process->CloseOutput() if( defined(my $handle = $process->GetOutputStream() ) );
                     Wx::Process::Kill($process->GetProcessId(), wxSIGKILL);
+                    
                 }elsif( $action->{action} eq 'closeinput') {
                     $process->CloseOutput() if( defined(my $handle = $process->GetOutputStream() ) );
+                    
                 } elsif( $action->{action} eq 'write') {
                     if(defined( my $fh = $process->GetOutputStream() )) {
                         print $fh $action->{writedata};
@@ -542,77 +548,72 @@ sub Notify {
                 }    
             }
             
-            my $procexitcode = $process->GetExitCode();
+            my $procexitcode = $process->GetExitCode;
             my $linedataread = 0;
             
-            # STDERR
-            if( my $linebuffer = $process->__read_error_line ){
-                $linedataread = 1;
-                $blockreadlines++;
-                $linebuffer =~ s/(\r\n|\n)$//;
-                my $event = Wx::Perl::ProcessStream::ProcessEvent->new( &Wx::Perl::ProcessStream::wxpEVT_PROCESS_STREAM_STDERR, -1 );
-                push(@{ $process->{_stderr_buffer} }, $linebuffer);
-                $event->SetLine( $linebuffer );
-                $event->SetProcess( $process );
-                $process->__get_handler()->AddPendingEvent($event);
-            }
+            if(!$process->_exit_event_posted) {
             
-            # STDOUT
-            if( my $linebuffer = $process->__read_input_line ){
-                $linedataread = 1;
-                $blockreadlines++;
-                $linebuffer =~ s/(\r\n|\n)$//;
-                my $event = Wx::Perl::ProcessStream::ProcessEvent->new( &Wx::Perl::ProcessStream::wxpEVT_PROCESS_STREAM_STDOUT, -1 );
-                push(@{ $process->{_stdout_buffer} }, $linebuffer);
-                $event->SetLine( $linebuffer );
-                $event->SetProcess( $process );
-                $process->__get_handler()->AddPendingEvent($event);
+                # STDERR
+
+                my $linecounter = 100;
+
+                while( ( my $linebuffer = $process->__read_error_line ) && $linecounter ){
+                    $continueprocessloop ++;
+                    $linedataread ++;
+                    $linebuffer =~ s/(\r\n|\n)$//;
+                    my $event = Wx::Perl::ProcessStream::ProcessEvent->new( &Wx::Perl::ProcessStream::wxpEVT_PROCESS_STREAM_STDERR, -1 );
+                    push(@{ $process->{_stderr_buffer} }, $linebuffer);
+                    $event->SetLine( $linebuffer );
+                    $event->SetProcess( $process );
+                    $process->__get_handler()->AddPendingEvent($event);
+                    $linecounter --;
+                }
+
+
+                # STDOUT
+
+                $linecounter = 100;
+
+                while( ( my $linebuffer = $process->__read_input_line ) && $linecounter ){
+                    $continueprocessloop ++;
+                    $linedataread ++;
+                    $linebuffer =~ s/(\r\n|\n)$//;
+                    my $event = Wx::Perl::ProcessStream::ProcessEvent->new( &Wx::Perl::ProcessStream::wxpEVT_PROCESS_STREAM_STDOUT, -1 );
+                    push(@{ $process->{_stdout_buffer} }, $linebuffer);
+                    $event->SetLine( $linebuffer );
+                    $event->SetProcess( $process );
+                    $process->__get_handler()->AddPendingEvent($event);
+                    $linecounter --;
+                }
+                
             }
-            
+                    
             if(defined($procexitcode) && !$linedataread) {
+                # defer exit event until we think all IO buffers are empty
+                # post no more events once we post exit event;
+                $process->_set_exit_event_posted(1);
                 my $event = Wx::Perl::ProcessStream::ProcessEvent->new( &Wx::Perl::ProcessStream::wxpEVT_PROCESS_STREAM_EXIT, -1);
                 $event->SetLine( undef );
                 $event->SetProcess( $process );
                 $process->__get_handler()->AddPendingEvent($event);
-                
-            } else {
-                push( @procsleft, $process );
             }
+            
         
         } # for my $process (@checkprocs) {
         
-        my $procsadded = 0;
         
-        # add any newly created procs
-        my @newprocs = @{ $self->{_procs} };
-        if( @newprocs ) {
-            push(@procsleft, @newprocs);
-            $self->{_procs} = [];
-            $procsadded = 1
-        }
+        #-----------------------------------------------------------------
+        # yield to allow changes to $self->{_procs}
+        # we will not exit this outer loop until $continueprocessloop == 0
+        #-----------------------------------------------------------------
         
-        @checkprocs = @procsleft;
-        
-        # loop if we have new procs or read data
-        if( $procsadded || $blockreadlines ) {
-            $continue = 1;
-        } else {
-            $continue = 0;
-        }
-        #--------------------------------------------------
-        # yield whilst $self->{_procs} is populated
-        #--------------------------------------------------
-        $self->{_procs} = \@checkprocs;
         Wx::wxTheApp->Yield();
-        @checkprocs = @{ $self->{_procs} };
-        $self->{_procs} = [];
-        
-    } # while( $continue ) {
+                
+    } # while( $continueprocessloop ) {
     
-    $self->{_procs} = \@checkprocs;
     $self->{_notify_in_progress} = 0;
-    
-    $self->Stop() unless( @checkprocs );
+    $self->Stop() unless( $self->ProcessCount  );
+    return 1;
 }
 
 sub Start {
@@ -634,6 +635,23 @@ sub AddProc {
     $self->Start($self->{_pollinterval}) if(!$self->IsRunning());
 }
 
+sub RemoveProc {
+    my($self, $proc) = @_;
+    my $checkpid = $proc->GetPid;
+    my @oldprocs = @{ $self->{_procs} };
+    my @newprocs = ();
+    for ( @oldprocs ) {
+        push(@newprocs, $_) if $_->GetPid != $checkpid;
+    }
+    $self->{_procs} = \@newprocs;
+    delete $Wx::Perl::ProcessStream::Process::_runningpids->{$checkpid};
+}
+
+sub ProcessCount {
+    my $self = shift;
+    return scalar @{ $self->{_procs} };
+}
+
 #-----------------------------------------------------
 # PACKAGE Wx::Perl::ProcessStream::Process
 #
@@ -641,6 +659,7 @@ sub AddProc {
 #-----------------------------------------------------
 
 package Wx::Perl::ProcessStream::Process;
+use strict;
 use Wx 0.50 qw(
     wxSIGTERM
     wxSIGKILL
@@ -781,15 +800,14 @@ sub __set_process_name {
     $self->{_procname} = shift;
 }
 
-sub GetExitCode {
+sub GetExitCode { 
     my $self = shift;
-    my $pid = $self->GetPid;
-    if(!defined($self->{_stored_exit_code})) {
-        $self->{_stored_exit_code} = $_runningpids->{$pid};
+    if(!defined($self->{_stored_event_exit_code})) {
+        my $pid = $self->GetPid;
+        $self->{_stored_event_exit_code} = $_runningpids->{$pid};
     }
-    return $self->{_stored_exit_code};
+    return $self->{_stored_event_exit_code};
 }
-
 
 sub GetStdOutBuffer {
     my $self = shift;
@@ -837,12 +855,17 @@ sub CloseInput {
     push(@{ $self->{_await_actions} }, { action => 'closeinput', } );
 }
 
+sub _exit_event_posted { $_[0]->{_exit_event_posted} }
+
+sub _set_exit_event_posted { $_[0]->{_exit_event_posted} = $_[1]; }
+
 sub IsAlive {
     my $self = shift;
     my $alive = Wx::Process::Kill( $self->GetProcessId(), wxSIGNONE );
+    
     return 0 if $alive == wxKILL_NO_PROCESS;
     
-    if( defined($self->GetExitCode) ) {
+    if( defined( $self->GetExitCode ) ) {
         # wait for a while to allow process to drop
         my $maxwait = 10.0;       #seconds
         my $interval = 0.1;       #seconds
@@ -868,8 +891,7 @@ sub IsAlive {
 sub Destroy {
     my $self = shift;
     Wx::Process::Kill($self->GetPid(), wxSIGKILL) if $self->IsAlive; # this will force us to wait for exit if we have received exit event
-    my $pid = $self->GetPid;
-    delete($_runningpids->{$pid});
+    $Wx::Perl::ProcessStream::ProcHandler->RemoveProc( $self );
     $self->SUPER::Destroy;
 }
 
@@ -886,6 +908,7 @@ sub DESTROY {
 #-----------------------------------------------------
 
 package Wx::Perl::ProcessStream::ProcessEvent;
+use strict;
 use Wx;
 use base qw( Wx::PlCommandEvent );
 
@@ -926,9 +949,11 @@ sub Clone {
 
 
 package Wx::Perl::ProcessStream::ProcEvtHandler;
+use strict;
 use Wx 0.50 qw( wxID_ANY );
 use base qw( Wx::Process );
 use Wx::Event qw(EVT_END_PROCESS);
+
 
 sub new {
     my ($class, @args) = @_;
@@ -945,7 +970,7 @@ sub OnEventEndProcess {
     $event->Skip(0);
     my $pid = $event->GetPid;
     my $exitcode = $event->GetExitCode;
-    $_runningpids->{$pid} = $exitcode;
+    $Wx::Perl::ProcessStream::Process::_runningpids->{$pid} = $exitcode;
 }
 
 
