@@ -11,7 +11,7 @@
 
 package Wx::Perl::ProcessStream;
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 =head1 NAME
 
@@ -19,7 +19,7 @@ Wx::Perl::ProcessStream - access IO of external processes via events
 
 =head1 VERSION
 
-Version 0.19
+Version 0.20
 
 =head1 SYNOPSYS
 
@@ -109,12 +109,13 @@ your command.
                     reference to an array containing the command and parameters.
     $name         = an arbitray name for the process.
     $eventhandler = the Wx EventHandler (Wx:Window) that will handle events for this process.
-    $readmethod   = 'getc' or 'readline' (default = 'readline') an optional param. From Wx version
+    $readmethod   = 'read' or 'readline' (default = 'readline') an optional param. From Wx version
                     0.75 you can specifiy the method you wish to use to read the output of an
                     external process.
                     The default depends on your Wx version ( 'getc' < 0.75,'readline' >= 0.75) 
-                    getc       -- uses the Wx::InputStream->GetC method to read bytes. 
-                    readline   -- uses the wxPerl implementation of Wx::InputStream->READLINE.
+                    read       -- uses the Wx::InputStream->READ method to read bytes. 
+                    readline   -- uses the Wx::InputStream->READLINE method to read bytes
+                    getc       -- alias for read (getc not actually used)
 
 =item Run
 
@@ -647,6 +648,18 @@ sub RemoveProc {
     delete $Wx::Perl::ProcessStream::Process::_runningpids->{$checkpid};
 }
 
+sub FindProc {
+    my($self, $pid) = @_;
+    my $foundproc = undef;
+    for ( @{ $self->{_procs} } ) {
+        if ($pid == $_->GetPid) {
+            $foundproc = $_;
+            last;
+        }
+    }
+    return $foundproc;
+}
+
 sub ProcessCount {
     my $self = shift;
     return scalar @{ $self->{_procs} };
@@ -685,18 +698,18 @@ sub new {
     my ($class, $command, $procname, $handler, $readmethod) = @_;
     
     $procname   ||= 'any';
-    $readmethod ||= ($Wx::VERSION > 0.74) ? 'readline' : 'getc';
+    $readmethod ||= ($Wx::VERSION > 0.74) ? 'readline' : 'read';
     
     my $self = $class->SUPER::new($_eventhandler);
     
     $self->Redirect();
     $self->SetAppCloseAction($WXP_DEFAULT_CLOSE_ACTION);
     
-    $self->{__readlinemethod} = ( lc($readmethod) eq 'readline' ) ? 1 : 0;
-    if($self->{__readlinemethod} && ($Wx::VERSION < 0.75)) {
-        carp('A read method of "readline" cannot be used with Wx versions < 0.75. Reverting to default "getc" method');
-        $readmethod = 'getc';
-        $self->{__readlinemethod} = 0;
+    $self->{_readlineon} = ( lc($readmethod) eq 'readline' ) ? 1 : 0;
+    if($self->{_readlineon} && ($Wx::VERSION < 0.75)) {
+        carp('A read method of "readline" cannot be used with Wx versions < 0.75. Reverting to default "read" method');
+        $readmethod = 'read';
+        $self->{_readlineon} = 0;
     }
     
     print qq(read method is $readmethod\n) if($Wx::Perl::ProcessStream::WXPDEBUG);
@@ -735,12 +748,15 @@ sub __read_input_line {
     my $linebuffer;
     my $charbuffer = '0';
     use bytes;
-    if($self->{__readlinebytes}) {
+    if($self->{_readlineon}) {
+         #print qq(readline method used for pid: ) . $self->GetPid . qq(\n) if($Wx::Perl::ProcessStream::WXPDEBUG);
          if( $self->IsInputAvailable() && defined( my $tempbuffer = readline( $self->GetInputStream() ) ) ){
+            
             $linebuffer = $tempbuffer;
          }        
     } else {
-        while($self->IsInputAvailable() && ( my $chars = read($self->GetInputStream(),$charbuffer,1 ) ) ) {
+        #print qq(read method used for pid: ) . $self->GetPid . qq(\n) if($Wx::Perl::ProcessStream::WXPDEBUG);
+        while( $self->IsInputAvailable() && ( my $chars = read($self->GetInputStream(),$charbuffer,1 ) ) ) {
             last if(!$chars);
             $linebuffer .= $charbuffer;
             last if($charbuffer eq "\n");
@@ -755,11 +771,13 @@ sub __read_error_line {
     my $linebuffer;
     my $charbuffer = '0';
     use bytes;
-    if($self->{__readlinebytes}) {
+    if($self->{_readlineon}) {
+        #print qq(readline method used for pid: ) . $self->GetPid . qq(\n) if($Wx::Perl::ProcessStream::WXPDEBUG);
          if( $self->IsErrorAvailable() && defined( my $tempbuffer = readline( $self->GetErrorStream() ) ) ){
             $linebuffer = $tempbuffer;
          }
     } else {
+        #print qq(read method used for pid: ) . $self->GetPid . qq(\n) if($Wx::Perl::ProcessStream::WXPDEBUG);
         while($self->IsErrorAvailable() && ( my $chars = read($self->GetErrorStream(),$charbuffer,1 ) ) ) {
             last if(!$chars);
             $linebuffer .= $charbuffer;
@@ -894,6 +912,7 @@ sub Destroy {
     Wx::Process::Kill($self->GetPid(), wxSIGKILL) if $self->IsAlive; # this will force us to wait for exit if we have received exit event
     $Wx::Perl::ProcessStream::ProcHandler->RemoveProc( $self );
     $self->SUPER::Destroy;
+    $self = undef;
 }
 
 sub DESTROY {
@@ -931,20 +950,24 @@ sub SetLine {
 
 sub GetProcess {
     my $self = shift;
-    return $self->{_process};
+    return $Wx::Perl::ProcessStream::ProcHandler->FindProc( $self->_get_pid );
+    
 }
 
 sub SetProcess {
-    my $self = shift;
-    $self->{_process} = shift;
+    my ($self, $process) = @_;
+    $self->_set_pid( $process->GetPid );
 }
+
+sub _get_pid { $_[0]->{_pid}; }
+sub _set_pid { $_[0]->{_pid} = $_[1]; }
 
 sub Clone {
     my $self = shift;
     my $class = ref $self;
     my $clone = $class->new( $self->GetEventType(), $self->GetId() );
     $clone->SetLine( $self->GetLine );
-    $clone->SetProcess( $self->GetProcess );
+    $clone->_set_pid( $self->_get_pid );
     return $clone;
 }
 
