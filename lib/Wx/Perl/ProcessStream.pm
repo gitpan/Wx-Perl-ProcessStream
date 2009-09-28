@@ -11,7 +11,7 @@
 
 package Wx::Perl::ProcessStream;
 
-our $VERSION = '0.18';
+our $VERSION = '0.19';
 
 =head1 NAME
 
@@ -19,7 +19,7 @@ Wx::Perl::ProcessStream - access IO of external processes via events
 
 =head1 VERSION
 
-Version 0.18
+Version 0.19
 
 =head1 SYNOPSYS
 
@@ -598,7 +598,7 @@ sub Notify {
                 $process->__get_handler()->AddPendingEvent($event);
             }
             
-        
+            #Wx::wxTheApp->Yield;
         } # for my $process (@checkprocs) {
         
         
@@ -725,6 +725,7 @@ sub Run {
         $Wx::Perl::ProcessStream::ProcHandler->AddProc( $self );
         return $self;
     } else {
+        $self->Destroy;
         return undef;
     }
 }

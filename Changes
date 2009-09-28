@@ -1,5 +1,9 @@
 Revision history for Wx-Perl-ProcessStream
 
+0.19    2009-06-28 00:00
+        Fixed bug where process obj not destroyed if 
+        command fails.
+        
 0.18    2009-06-27 00:00
         Exit code error in 0.17 ; 
         schoolboy error (use strict you fool!)
