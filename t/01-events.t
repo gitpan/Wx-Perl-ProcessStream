@@ -211,7 +211,7 @@ sub RunTests {
     for (my $i = 0; $i < $ENV{WXPPS_MULTITEST}; $i ++) {
         my $sleeptime =  1 + (int(rand(10))/ 10); # sleep between 1.1 and 1.9 seconds - we want instances to exit in random order
         my $exitcode = 1 + int(rand(100)); # exitcodes 1 to 100
-        my $multicmd = 'perl -e"use Time::HiRes qw( sleep ); sleep ' . $sleeptime . '; print qq(GOODBYE WORLD FROM PID: $$ INSTANCE: ' . $i . '\n); exit(' . $exitcode . ');"';
+        my $multicmd = 'perl -e "use Time::HiRes qw( sleep ); sleep ' . $sleeptime . '; print qq(GOODBYE WORLD FROM PID: $$ INSTANCE: ' . $i . '\n); exit(' . $exitcode . ');"';
         my $multiprocess = $self->start_process_b( $multicmd );
         my $multipid = $multiprocess->GetPid;
         $self->{_multiresult}->{$multipid}->{expected} = $exitcode;

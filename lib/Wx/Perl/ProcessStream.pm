@@ -11,7 +11,7 @@
 
 package Wx::Perl::ProcessStream;
 
-our $VERSION = '0.20';
+our $VERSION = '0.21';
 
 =head1 NAME
 
@@ -19,7 +19,7 @@ Wx::Perl::ProcessStream - access IO of external processes via events
 
 =head1 VERSION
 
-Version 0.20
+Version 0.21
 
 =head1 SYNOPSYS
 

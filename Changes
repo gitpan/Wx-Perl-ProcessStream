@@ -1,24 +1,27 @@
 Revision history for Wx-Perl-ProcessStream
 
-0.20    2009-06-28 00:00
+0.21    2009-10-13 00:00
+        Fixed test failure on none Win32.
+
+0.20    2009-09-28 00:00
         Readline method now actually used.
 
-0.19    2009-06-28 00:00
+0.19    2009-09-28 00:00
         Fixed bug where process obj not destroyed if 
         command fails.
         
-0.18    2009-06-27 00:00
+0.18    2009-09-27 00:00
         Exit code error in 0.17 ; 
         schoolboy error (use strict you fool!)
 
-0.17    2009-06-26 00:00
+0.17    2009-09-26 00:00
         Should now run multiple side by side processes OK
 
-0.16    2009-06-26 00:00
+0.16    2009-09-26 00:00
         Added new, Run and GetPid methods to process
         updated pod
         
-0.14    2009-06-25 00:00
+0.14    2009-09-25 00:00
         Fixed timing issue with Vista / Win7 
         ( CPAN RT 44795 et al )
 
