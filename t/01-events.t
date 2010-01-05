@@ -3,7 +3,7 @@ BEGIN { $ENV{WXPPS_MULTITEST} ||= 10; $ENV{WXPPS_POLLINTERVAL} ||= 100;}
 package main;
 
 use strict;
-use Test::More tests => 45 + $ENV{WXPPS_MULTITEST};
+use Test::More tests => 51 + $ENV{WXPPS_MULTITEST};
 use lib 't';
 use Wx;
 use WxTesting qw( app_from_wxtesting_frame );
@@ -14,7 +14,7 @@ $app->MainLoop;
 package ProcessStreamTestingFrame;
 use strict;
 use base qw(WxTesting::Frame);
-use Wx::Perl::ProcessStream 0.18 qw( :everything );
+use Wx::Perl::ProcessStream 0.24 qw( :everything );
 use Test::More;
 use Time::HiRes qw( sleep );
 
@@ -43,6 +43,29 @@ sub RunTests {
     my $cmd;
     my $process;
     my $errs;
+    
+    if($^O =~ /^MSWin/) {
+        $cmd = [ $perl, '-e', q("print 0, qq(\n);") ];
+    } else {
+        $cmd = [ $perl, '-e', q(print 0, qq(\n);) ];
+    }
+    
+    {
+        $process = $self->start_process_a( $cmd );
+        ok( $process->IsAlive() );
+        $self->wait_for_test_complete();
+        is( $process->IsAlive(), 0 );
+        is( $self->{_stdout}->[0], '0' );
+        $errs = join('', @{ $self->{_stderr} });
+        $errs ||= '';
+        is( $errs, '' );
+        is( $self->{_exitcode}, 0 );
+        is( $process->GetExitCode() , 0 );
+        $process->Destroy;
+        $process = undef;
+    }
+    
+    
     if($^O =~ /^MSWin/) {
         $cmd = [ $perl, '-e', q("print 'HELLO WORLD', qq(\n);") ];
     } else {

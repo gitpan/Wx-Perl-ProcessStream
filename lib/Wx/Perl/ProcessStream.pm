@@ -11,7 +11,7 @@
 
 package Wx::Perl::ProcessStream;
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 
 =head1 NAME
 
@@ -19,7 +19,7 @@ Wx::Perl::ProcessStream - access IO of external processes via events
 
 =head1 VERSION
 
-Version 0.23
+Version 0.24
 
 =head1 SYNOPSYS
 
@@ -556,9 +556,6 @@ sub Notify {
             
                 # STDERR
 
-                #my $linecounter = 100;
-
-                #while( ( my $linebuffer = $process->__read_error_line ) && $linecounter ){
                 while( ( my $linebuffer = $process->__read_error_line ) ){
                     $continueprocessloop ++;
                     $linedataread ++;
@@ -568,13 +565,10 @@ sub Notify {
                     $event->SetLine( $linebuffer );
                     $event->SetProcess( $process );
                     $process->__get_handler()->AddPendingEvent($event);
-                    #$linecounter --;
                 }
 
 
                 # STDOUT
-
-                #$linecounter = 100;
 
                 while( ( my $linebuffer = $process->__read_input_line ) ){
                     $continueprocessloop ++;
@@ -585,7 +579,6 @@ sub Notify {
                     $event->SetLine( $linebuffer );
                     $event->SetProcess( $process );
                     $process->__get_handler()->AddPendingEvent($event);
-                    #$linecounter --;
                 }
                 
             }
