@@ -1,11 +1,11 @@
 --- #YAML:1.0
 name:                Wx-Perl-ProcessStream
-version:             0.22
+version:             0.23
 abstract:            access IO of external processes via events
 license:             ~
 author:              
     - Mark Dootson <mdootson@cpan.org>
-generated_by:        ExtUtils::MakeMaker version 6.42_01
+generated_by:        ExtUtils::MakeMaker version 6.42
 distribution_type:   module
 requires:     
     Time::HiRes:                   1.2
