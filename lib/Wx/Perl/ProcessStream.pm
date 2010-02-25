@@ -11,7 +11,7 @@
 
 package Wx::Perl::ProcessStream;
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 =head1 NAME
 
@@ -19,15 +19,16 @@ Wx::Perl::ProcessStream - access IO of external processes via events
 
 =head1 VERSION
 
-Version 0.24
+Version 0.25
 
 =head1 SYNOPSYS
 
     use Wx::Perl::ProcessStream qw( :everything );
     
-    EVT_WXP_PROCESS_STREAM_STDOUT( $self, \&evt_process_stdout);
-    EVT_WXP_PROCESS_STREAM_STDERR( $self, \&evt_process_stderr);
-    EVT_WXP_PROCESS_STREAM_EXIT  ( $self, \&evt_process_exit  );
+    EVT_WXP_PROCESS_STREAM_STDOUT    ( $self, \&evt_process_stdout );
+    EVT_WXP_PROCESS_STREAM_STDERR    ( $self, \&evt_process_stderr );
+    EVT_WXP_PROCESS_STREAM_EXIT      ( $self, \&evt_process_exit   );
+    EVT_WXP_PROCESS_STREAM_MAXLINES  ( $self, \&evt_process_maxlines  );
     
     my $proc1 = Wx::Perl::ProcessStream::Process->new('perl -e"print qq($_\n) for(@INC);"', 'MyName1', $self);
     $proc1->Run;
@@ -41,6 +42,8 @@ Version 0.24
     $proc3->Run;
     
     my $proc4 = Wx::Perl::ProcessStream::Process->new(\@args, 'MyName2', $self, 'readline')->Run;
+    
+    my $proc5 = Wx::Perl::ProcessStream::Process->new(\@args, 'MyName2', $self);
         
     sub evt_process_stdout {
         my ($self, $event) = @_;
@@ -81,6 +84,15 @@ Version 0.24
         $process->Destroy;
     }
     
+    sub evt_process_maxlines {
+        my ($self, $event) = @_;
+        my $process = $event->GetProcess;
+        
+        ..... bad process
+        
+        $process->Kill;
+    }
+    
 
 =head1 DESCRIPTION
 
@@ -110,12 +122,20 @@ your command.
     $name         = an arbitray name for the process.
     $eventhandler = the Wx EventHandler (Wx:Window) that will handle events for this process.
     $readmethod   = 'read' or 'readline' (default = 'readline') an optional param. From Wx version
-                    0.75 you can specifiy the method you wish to use to read the output of an
+                    0.75 you can specify the method you wish to use to read the output of an
                     external process.
                     The default depends on your Wx version ( 'getc' < 0.75,'readline' >= 0.75) 
                     read       -- uses the Wx::InputStream->READ method to read bytes. 
                     readline   -- uses the Wx::InputStream->READLINE method to read bytes
                     getc       -- alias for read (getc not actually used)
+
+=item SetMaxLines
+
+Set the maximum number of lines that will be read from a continuous stream before raising a
+EVT_WXP_PROCESS_STREAM_MAXLINES event. The default is 1000. A continuous stream will cause
+your application to hang.
+
+    $process->SetMaxLines(10);
 
 =item Run
 
@@ -166,6 +186,32 @@ Calling this clears the process object internal stdout buffer.
 (This has no effect on the actual process I/O buffers.)
 
     my $arryref = $process->GetStdOutBuffer();
+
+=item GetStdErrBufferLineCount
+
+This returns the number of lines currently in the stderr buffer.
+
+    my $count = $process->GetStdErrBufferLineCount();
+
+=item GetStdOutBufferLineCount
+
+This returns the number of lines currently in the stdout buffer.
+
+    my $count = $process->GetStdOutBufferLineCount();
+
+=item PeekStdErrBuffer
+
+This returns a reference to an array containing all the lines sent by the process to stderr.
+To retrieve the buffer and clear it, call GetStdErrBuffer instead.
+
+    my $arryref = $process->PeekStdErrBuffer();
+
+=item PeekStdOutBuffer
+
+This returns a reference to an array containing all the lines sent by the process to stdout.
+To retrieve the buffer and clear it, call GetStdOutBuffer instead.
+
+    my $arryref = $process->PeekStdOutBuffer();
 
 =item GetProcessId
 
@@ -274,6 +320,19 @@ See GetDefaultAppCloseAction.
 
     $newdefaction = one of wxpSIGTERM or wxpSIGKILL
 
+=item SetDefaultMaxLines
+
+Sets the default maximum number of lines that will be processed continuously from
+an individual process. If a process produces a continuous stream of output, this would
+hang your application. This setting provides a maximum number of lines that will be
+read from the process streams before control is yielded and the events can be processed.
+Additionally, a EVT_WXP_PROCESS_STREAM_MAXLINES event will be sent to the eventhandler.
+The setting can also be set on an individual process basis using $process->SetMaxLines
+
+    Wx::Perl::ProcessStream->SetDefaultMaxLines( $maxlines );
+    
+    the default maxlines number is 1000
+
 =item GetPollInterval
 
 Get the current polling interval. See SetPollInterval.
@@ -323,6 +382,15 @@ The event subroutine will receive a Wx::Perl::ProcessStream::ProcessEvent when t
 
     EVT_WXP_PROCESS_STREAM_EXIT( $eventhandler, $codref );
 
+=item EVT_WXP_PROCESS_STREAM_MAXLINES
+
+Install an event handler for an event of type wxpEVT_PROCESS_STREAM_MAXLINES exported on request by this module.
+The event subroutine will receive a Wx::Perl::ProcessStream::ProcessEvent when the external process produces
+a continuous stream of lines on stderr and stdout that exceed the max lines set via $process->SetMaxLines or
+Wx::Perl::ProcessStream->SetDefaultMaxLines.
+
+    EVT_WXP_PROCESS_STREAM_MAXLINES( $eventhandler, $codref );
+
 =back
 
 =head3 Methods
@@ -341,7 +409,7 @@ This returns the process that raised the event. If this is a wxpEVT_PROCESS_STRE
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright (C) 2007-2009 Mark Dootson, all rights reserved.
+Copyright (C) 2007-2010 Mark Dootson, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
@@ -377,8 +445,6 @@ Wx::ExecuteStdout
 
 Wx::ExecuteStdoutStderr
 
-
-
 =cut
 
 #-----------------------------------------------------
@@ -403,20 +469,25 @@ if( Wx::wxVERSION() < 2.0060025) {
 # initialise
 #-----------------------------------------------------
 
-our ($ID_CMD_EXIT, $ID_CMD_STDOUT, $ID_CMD_STDERR, $WXP_DEFAULT_CLOSE_ACTION, $WXPDEBUG);
+our ($ID_CMD_EXIT, $ID_CMD_STDOUT, $ID_CMD_STDERR, $ID_CMD_MAXLINES,
+     $WXP_DEFAULT_CLOSE_ACTION, $WXP_DEFAULT_MAX_LINES, $WXPDEBUG);
 
 $ID_CMD_EXIT   = Wx::NewEventType();
 $ID_CMD_STDOUT = Wx::NewEventType();
 $ID_CMD_STDERR = Wx::NewEventType();
+$ID_CMD_MAXLINES = Wx::NewEventType();
 
 $WXP_DEFAULT_CLOSE_ACTION = wxSIGTERM;
+$WXP_DEFAULT_MAX_LINES = 1000;
 
 our @EXPORT_OK = qw( wxpEVT_PROCESS_STREAM_EXIT
                      wxpEVT_PROCESS_STREAM_STDERR
                      wxpEVT_PROCESS_STREAM_STDOUT
+                     wxpEVT_PROCESS_STREAM_MAXLINES
                      EVT_WXP_PROCESS_STREAM_STDOUT
                      EVT_WXP_PROCESS_STREAM_STDERR
                      EVT_WXP_PROCESS_STREAM_EXIT
+                     EVT_WXP_PROCESS_STREAM_MAXLINES
                      wxpSIGTERM
                      wxpSIGKILL
                     );
@@ -428,15 +499,17 @@ $EXPORT_TAGS{'all'} = \@EXPORT_OK;
 
 our $ProcHandler = Wx::Perl::ProcessStream::ProcessHandler->new();
 
-sub wxpEVT_PROCESS_STREAM_EXIT   () { $ID_CMD_EXIT }
-sub wxpEVT_PROCESS_STREAM_STDERR () { $ID_CMD_STDERR }
-sub wxpEVT_PROCESS_STREAM_STDOUT () { $ID_CMD_STDOUT }
+sub wxpEVT_PROCESS_STREAM_EXIT     () { $ID_CMD_EXIT }
+sub wxpEVT_PROCESS_STREAM_STDERR   () { $ID_CMD_STDERR }
+sub wxpEVT_PROCESS_STREAM_STDOUT   () { $ID_CMD_STDOUT }
+sub wxpEVT_PROCESS_STREAM_MAXLINES () { $ID_CMD_MAXLINES }
 sub wxpSIGTERM () { wxSIGTERM }
 sub wxpSIGKILL () { wxSIGKILL }
 
-sub EVT_WXP_PROCESS_STREAM_STDOUT ($$) { $_[0]->Connect(-1,-1,&wxpEVT_PROCESS_STREAM_STDOUT, $_[1] ) };
-sub EVT_WXP_PROCESS_STREAM_STDERR ($$) { $_[0]->Connect(-1,-1,&wxpEVT_PROCESS_STREAM_STDERR, $_[1] ) };
-sub EVT_WXP_PROCESS_STREAM_EXIT   ($$) { $_[0]->Connect(-1,-1,&wxpEVT_PROCESS_STREAM_EXIT,   $_[1] ) };
+sub EVT_WXP_PROCESS_STREAM_STDOUT   ($$) { $_[0]->Connect(-1,-1,&wxpEVT_PROCESS_STREAM_STDOUT, $_[1] ) };
+sub EVT_WXP_PROCESS_STREAM_STDERR   ($$) { $_[0]->Connect(-1,-1,&wxpEVT_PROCESS_STREAM_STDERR, $_[1] ) };
+sub EVT_WXP_PROCESS_STREAM_EXIT     ($$) { $_[0]->Connect(-1,-1,&wxpEVT_PROCESS_STREAM_EXIT,   $_[1] ) };
+sub EVT_WXP_PROCESS_STREAM_MAXLINES ($$) { $_[0]->Connect(-1,-1,&wxpEVT_PROCESS_STREAM_MAXLINES,   $_[1] ) };
 
 # Old interface - call Wx::Perl::ProcessStream::new
 
@@ -453,9 +526,14 @@ sub SetDefaultAppCloseAction {
     $WXP_DEFAULT_CLOSE_ACTION = ($newaction == wxSIGTERM||wxSIGKILL) ?  $newaction : $WXP_DEFAULT_CLOSE_ACTION;
 }
 
-sub GetDefaultAppCloseAction {
-    $WXP_DEFAULT_CLOSE_ACTION;
+sub GetDefaultAppCloseAction { $WXP_DEFAULT_CLOSE_ACTION; }
+
+sub SetDefaultMaxLines {
+    my $class = shift;
+    $WXP_DEFAULT_MAX_LINES = shift || 1;
 }
+
+sub GetDefaultMaxLines { $WXP_DEFAULT_MAX_LINES; }
 
 sub GetPollInterval {
     $ProcHandler->GetInterval();
@@ -551,11 +629,12 @@ sub Notify {
             
             my $procexitcode = $process->GetExitCode;
             my $linedataread = 0;
-            
+            my $maxlinecount = $process->GetMaxLines;
+            $maxlinecount = 1 if $maxlinecount < 1; 
             if(!$process->_exit_event_posted) {
             
                 # STDERR
-
+                
                 while( ( my $linebuffer = $process->__read_error_line ) ){
                     $continueprocessloop ++;
                     $linedataread ++;
@@ -565,24 +644,27 @@ sub Notify {
                     $event->SetLine( $linebuffer );
                     $event->SetProcess( $process );
                     $process->__get_handler()->AddPendingEvent($event);
+                    last if $linedataread == $maxlinecount;
                 }
 
 
                 # STDOUT
-
-                while( ( my $linebuffer = $process->__read_input_line ) ){
-                    $continueprocessloop ++;
-                    $linedataread ++;
-                    $linebuffer =~ s/(\r\n|\n)$//;
-                    my $event = Wx::Perl::ProcessStream::ProcessEvent->new( &Wx::Perl::ProcessStream::wxpEVT_PROCESS_STREAM_STDOUT, -1 );
-                    push(@{ $process->{_stdout_buffer} }, $linebuffer);
-                    $event->SetLine( $linebuffer );
-                    $event->SetProcess( $process );
-                    $process->__get_handler()->AddPendingEvent($event);
+                if( $linedataread < $maxlinecount ) {
+                    while( ( my $linebuffer = $process->__read_input_line ) ){  
+                        $continueprocessloop ++;
+                        $linedataread ++;
+                        $linebuffer =~ s/(\r\n|\n)$//;
+                        my $event = Wx::Perl::ProcessStream::ProcessEvent->new( &Wx::Perl::ProcessStream::wxpEVT_PROCESS_STREAM_STDOUT, -1 );
+                        push(@{ $process->{_stdout_buffer} }, $linebuffer);
+                        $event->SetLine( $linebuffer );
+                        $event->SetProcess( $process );
+                        $process->__get_handler()->AddPendingEvent($event);
+                        last if $linedataread == $maxlinecount;
+                    }
                 }
                 
             }
-                    
+            
             if(defined($procexitcode) && !$linedataread) {
                 # defer exit event until we think all IO buffers are empty
                 # post no more events once we post exit event;
@@ -593,9 +675,16 @@ sub Notify {
                 $process->__get_handler()->AddPendingEvent($event);
             }
             
-            #Wx::wxTheApp->Yield;
+            # raise the maxline event if required
+            # this will be actioned during outer loop yield
+            if($linedataread == $maxlinecount) {
+                my $event = Wx::Perl::ProcessStream::ProcessEvent->new( &Wx::Perl::ProcessStream::wxpEVT_PROCESS_STREAM_MAXLINES, -1 );
+                $event->SetLine( undef );
+                $event->SetProcess( $process );
+                $process->__get_handler()->AddPendingEvent($event);
+            }
+            
         } # for my $process (@checkprocs) {
-        
         
         #-----------------------------------------------------------------
         # yield to allow changes to $self->{_procs}
@@ -697,8 +786,8 @@ sub new {
     my $self = $class->SUPER::new($_eventhandler);
     
     $self->Redirect();
-    $self->SetAppCloseAction($WXP_DEFAULT_CLOSE_ACTION);
-    
+    $self->SetAppCloseAction(Wx::Perl::ProcessStream->GetDefaultAppCloseAction());
+    $self->SetMaxLines(Wx::Perl::ProcessStream->GetDefaultMaxLines());
     $self->{_readlineon} = ( lc($readmethod) eq 'readline' ) ? 1 : 0;
     if($self->{_readlineon} && ($Wx::VERSION < 0.75)) {
         carp('A read method of "readline" cannot be used with Wx versions < 0.75. Reverting to default "read" method');
@@ -714,7 +803,6 @@ sub new {
     $self->{_stderr_buffer} = [];
     $self->{_stdout_buffer} = [];
     $self->{_arg_command} = $command;
-    
     return $self;
 }
 
@@ -737,17 +825,19 @@ sub Run {
     }
 }
 
+sub SetMaxLines { $_[0]->{_max_read_lines} = $_[1]; }
+sub GetMaxLines { $_[0]->{_max_read_lines} }
+
 sub __read_input_line {
     my $self = shift;
     my $linebuffer;
     my $charbuffer = '0';
     use bytes;
     if($self->{_readlineon}) {
-         #print qq(readline method used for pid: ) . $self->GetPid . qq(\n) if($Wx::Perl::ProcessStream::WXPDEBUG);
-         if( $self->IsInputAvailable() && defined( my $tempbuffer = readline( $self->GetInputStream() ) ) ){
-            
+        #print qq(readline method used for pid: ) . $self->GetPid . qq(\n) if($Wx::Perl::ProcessStream::WXPDEBUG);
+        if( $self->IsInputAvailable() && defined( my $tempbuffer = readline( $self->GetInputStream() ) ) ){
             $linebuffer = $tempbuffer;
-         }        
+        }        
     } else {
         #print qq(read method used for pid: ) . $self->GetPid . qq(\n) if($Wx::Perl::ProcessStream::WXPDEBUG);
         while( $self->IsInputAvailable() && ( my $chars = read($self->GetInputStream(),$charbuffer,1 ) ) ) {
@@ -767,9 +857,9 @@ sub __read_error_line {
     use bytes;
     if($self->{_readlineon}) {
         #print qq(readline method used for pid: ) . $self->GetPid . qq(\n) if($Wx::Perl::ProcessStream::WXPDEBUG);
-         if( $self->IsErrorAvailable() && defined( my $tempbuffer = readline( $self->GetErrorStream() ) ) ){
+        if( $self->IsErrorAvailable() && defined( my $tempbuffer = readline( $self->GetErrorStream() ) ) ){
             $linebuffer = $tempbuffer;
-         }
+        }
     } else {
         #print qq(read method used for pid: ) . $self->GetPid . qq(\n) if($Wx::Perl::ProcessStream::WXPDEBUG);
         while($self->IsErrorAvailable() && ( my $chars = read($self->GetErrorStream(),$charbuffer,1 ) ) ) {
@@ -833,6 +923,28 @@ sub GetStdErrBuffer {
     my $self = shift;
     my @buffers = @{ $self->{_stderr_buffer} };
     $self->{_stderr_buffer} = [];
+    return \@buffers;
+}
+
+sub GetStdOutBufferLineCount {
+    my $self = shift;
+    return scalar @{ $self->{_stdout_buffer} };
+}
+
+sub GetStdErrBufferLineCount {
+    my $self = shift;
+    return scalar @{ $self->{_stderr_buffer} };
+}
+
+sub PeekStdOutBuffer {
+    my $self = shift;
+    my @buffers = @{ $self->{_stdout_buffer} };
+    return \@buffers;
+}
+
+sub PeekStdErrBuffer {
+    my $self = shift;
+    my @buffers = @{ $self->{_stderr_buffer} };
     return \@buffers;
 }
 

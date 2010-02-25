@@ -2,7 +2,7 @@
 
 Wx-Perl-ProcessStream
 
-(c)2007 - 2009 Mark Dootson
+(c)2007 - 2010 Mark Dootson
 
 #########################################################
 
@@ -20,8 +20,7 @@ INSTALLATION
 
 Linux / *nix
 
-To install this module, using VC6 run the following 
-commands
+To install this module the following commands
 
     perl Makefile.PL
     make
@@ -40,7 +39,7 @@ commands
 
 COPYRIGHT AND LICENCE
 
-Copyright (C) 2007-2009 Mark Dootson
+Copyright (C) 2007-2010 Mark Dootson
 
 This program is free software; you can redistribute it 
 and/or modify it under the same terms as Perl itself.

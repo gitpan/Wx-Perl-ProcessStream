@@ -3,7 +3,7 @@ BEGIN { $ENV{WXPPS_MULTITEST} ||= 10; $ENV{WXPPS_POLLINTERVAL} ||= 100;}
 package main;
 
 use strict;
-use Test::More tests => 51 + $ENV{WXPPS_MULTITEST};
+use Test::More tests => 68 + $ENV{WXPPS_MULTITEST};
 use lib 't';
 use Wx;
 use WxTesting qw( app_from_wxtesting_frame );
@@ -24,7 +24,8 @@ sub new {
     my $self = $class->SUPER::new( undef, -1, 'Testing Wx::Perl::ProcessStream ');
     EVT_WXP_PROCESS_STREAM_STDOUT( $self, \&evt_process);
     EVT_WXP_PROCESS_STREAM_STDERR( $self, \&evt_process);
-    EVT_WXP_PROCESS_STREAM_EXIT( $self, \&evt_process);
+    EVT_WXP_PROCESS_STREAM_EXIT(   $self, \&evt_process);
+    EVT_WXP_PROCESS_STREAM_MAXLINES(   $self, \&evt_process);
     $self->{_stdout} = [];
     $self->{_stderr} = [];
     $self->{_exitcode} = undef;
@@ -266,6 +267,51 @@ sub RunTests {
     
     is(Wx::Perl::ProcessStream::ProcessCount(), 0, 'check process count is zero');
     
+    
+    # test group 8 - maxline testing
+    {
+        $self->{_eventmode} = 'single';
+        
+        if($^O =~ /^MSWin/) {
+            $cmd = [ $perl, '-e', q("$x = 1200; while($x){ print qq($x\n); $x--; };") ];
+        } else {
+            $cmd = [ $perl, '-e', q($x = 1200; while($x){ print qq($x\n); $x--; };) ];
+        }
+        $self->{_maxlineevtcount} = 0;
+        $process = $self->start_process_b( $cmd );
+        ok( $process->IsAlive() );
+        $self->wait_for_test_complete();
+        is( $process->IsAlive(), 0 );
+        is( $self->{_stdout}->[0], 1200 );
+        my $num = scalar @{$self->{_stdout}};
+        is( $self->{_stdout}->[$num -1], 1 );
+        is( $num, 1200 );
+        is( $self->{_exitcode}, 0 );
+        is( $process->GetExitCode() , 0 );
+        $process->Destroy;
+        $process = undef;
+        is( $self->{_maxlineevtcount}, 1 );
+        
+        Wx::Perl::ProcessStream->SetDefaultMaxLines(10);
+        is( Wx::Perl::ProcessStream->GetDefaultMaxLines, 10 );
+        $self->{_maxlineevtcount} = 0;
+        
+        $process = $self->start_process_b( $cmd );
+        ok( $process->IsAlive() );
+        $self->wait_for_test_complete();
+        is( $process->IsAlive(), 0 );
+        is( $self->{_stdout}->[0], 1200 );
+        $num = scalar @{$self->{_stdout}};
+        is( $self->{_stdout}->[$num -1], 1 );
+        is( $num, 1200 );
+        is( $self->{_exitcode}, 0 );
+        is( $process->GetExitCode() , 0 );
+        $process->Destroy;
+        $process = undef;
+        is( $self->{_maxlineevtcount}, 120 );
+        
+    }
+    
     return 1;
 }
 
@@ -321,6 +367,8 @@ sub evt_process {
         push(@{ $self->{_stdout} }, $line);
     } elsif ( $evttype == wxpEVT_PROCESS_STREAM_STDERR) {
         push(@{ $self->{_stderr} }, $line);
+    } elsif ( $evttype == wxpEVT_PROCESS_STREAM_MAXLINES) {
+       $self->{_maxlineevtcount} ++;
     } elsif ( $evttype == wxpEVT_PROCESS_STREAM_EXIT) {
         if( $self->{_eventmode} ne 'multi') {
             $self->{_exitcode} = $process->GetExitCode();
@@ -331,5 +379,7 @@ sub evt_process {
         }
     }
 }
+
+
 
 1;

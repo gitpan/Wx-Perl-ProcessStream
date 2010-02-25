@@ -1,5 +1,13 @@
 Revision history for Wx-Perl-ProcessStream
 
+0.25    2010-02-25 00:00
+        Continuous stream will hang app rt.cpan.org #54962
+        Fixed by adding SetMaxLines setting with default 1000
+        Added PeekStdErrBuffer, PeekStdOutBuffer
+        Added GetStdErrBufferLineCount GetStdOutBufferLineCount
+        Added EVT_WXP_PROCESS_STREAM_MAXLINES
+        Stopped tests displaying frame (not necessary in this case)
+
 0.24    2010-01-05 00:00
         Added tests to confirm correct operation of 'print 0;' 
         

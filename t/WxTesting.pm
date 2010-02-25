@@ -86,7 +86,7 @@ sub OnInit {
 	my $frameclass = &$framesub;
 	my $mainwindow = $frameclass->new(undef, -1, 'Wx Testing Frame');
 	$self->SetTopWindow($mainwindow);
-	$mainwindow->Show(1);
+	#$mainwindow->Show(1);
 	return 1;
 }
 
