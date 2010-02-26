@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Wx-Perl-ProcessStream
-version:            0.25
+version:            0.26
 abstract:           access IO of external processes via events
 author:
     - Mark Dootson <mdootson@cpan.org>

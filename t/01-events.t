@@ -14,7 +14,7 @@ $app->MainLoop;
 package ProcessStreamTestingFrame;
 use strict;
 use base qw(WxTesting::Frame);
-use Wx::Perl::ProcessStream 0.24 qw( :everything );
+use Wx::Perl::ProcessStream 0.26 qw( :everything );
 use Test::More;
 use Time::HiRes qw( sleep );
 
@@ -339,6 +339,7 @@ sub wait_for_test_complete {
     my $self = shift;
     while(!defined($self->{_exitcode})) {
         Wx::wxTheApp->Yield();
+        sleep 0.1;
     }
 }
 

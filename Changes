@@ -1,5 +1,10 @@
 Revision history for Wx-Perl-ProcessStream
 
+0.26    2010-02-26 00:00
+        Changed behaviour of $process->IsAlive
+        will now return false if process has
+        already returned an exit code.
+
 0.25    2010-02-25 00:00
         Continuous stream will hang app rt.cpan.org #54962
         Fixed by adding SetMaxLines setting with default 1000

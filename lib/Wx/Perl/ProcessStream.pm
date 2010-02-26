@@ -11,7 +11,7 @@
 
 package Wx::Perl::ProcessStream;
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 
 =head1 NAME
 
@@ -19,7 +19,7 @@ Wx::Perl::ProcessStream - access IO of external processes via events
 
 =head1 VERSION
 
-Version 0.25
+Version 0.26
 
 =head1 SYNOPSYS
 
@@ -228,10 +228,9 @@ Returns the process id assigned by the system.
 =item IsAlive
 
 Check if the process still exists in the system.
-Returns 1 if process exists, 0 if process does not exist, and undefined if there was some problem 
-in signaling the process. If the process has already signalled its exit, the IsAlive method will
-wait until the system recogises the process exit before returning. Therefore IsAlive should 
-always return 0 (false) once a EVT_WXP_PROCESS_STREAM_EXIT event has been received.
+Returns 1 if process exists, 0 if process does not exist. If the process has already
+signalled its exit, the IsAlive method will always return 0. Therefore IsAlive should 
+always return 0 (false) once a EVT_WXP_PROCESS_STREAM_EXIT event has been sent.
 
     my $isalive = $process->IsAlive();
 
@@ -986,31 +985,18 @@ sub _set_exit_event_posted { $_[0]->{_exit_event_posted} = $_[1]; }
 
 sub IsAlive {
     my $self = shift;
-    my $alive = Wx::Process::Kill( $self->GetProcessId(), wxSIGNONE );
     
-    return 0 if $alive == wxKILL_NO_PROCESS;
+    # if we already have the exitcode from the system
+    # we should return 0 - regardless if system tells
+    # us process is still hanging around - as it will
+    # sometimes
     
-    if( defined( $self->GetExitCode ) ) {
-        # wait for a while to allow process to drop
-        my $maxwait = 10.0;       #seconds
-        my $interval = 0.1;       #seconds
-        while($maxwait > 0.0) {
-            
-            $alive = Wx::Process::Kill( $self->GetProcessId(), wxSIGNONE );
-            last if $alive != wxKILL_OK;
-            
-            $maxwait -= $interval;
-            sleep ( $interval ) if $maxwait > 0.0;
-        }
-    }
+    return 0 if defined( $self->GetExitCode );
     
-    if( $alive == wxKILL_NO_PROCESS ) {
-        return 0;
-    } elsif( $alive == wxKILL_OK ) {
-        return 1;
-    } else {
-        return undef;
-    }
+    # otherwise, return the system result
+    
+    return (  Wx::Process::Exists( $self->GetProcessId() ) ) ? 1 : 0;
+    
 }
 
 sub Destroy {
@@ -1077,13 +1063,11 @@ sub Clone {
     return $clone;
 }
 
-
 package Wx::Perl::ProcessStream::ProcEvtHandler;
 use strict;
 use Wx 0.50 qw( wxID_ANY );
 use base qw( Wx::Process );
 use Wx::Event qw(EVT_END_PROCESS);
-
 
 sub new {
     my ($class, @args) = @_;
@@ -1103,8 +1087,8 @@ sub OnEventEndProcess {
     $Wx::Perl::ProcessStream::Process::_runningpids->{$pid} = $exitcode;
 }
 
-
 1;
+
 __END__
 
 
