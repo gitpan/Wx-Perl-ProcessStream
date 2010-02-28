@@ -4,14 +4,14 @@
 ## Author:      Mark Dootson
 ## Modified by:
 ## Created:     11/05/2007
-## Copyright:   (c) 2007-2009 Mark Dootson
+## Copyright:   (c) 2007-2010 Mark Dootson
 ## Licence:     This program is free software; you can redistribute it and/or
 ##              modify it under the same terms as Perl itself
 #############################################################################
 
 package Wx::Perl::ProcessStream;
 
-our $VERSION = '0.26';
+our $VERSION = '0.27';
 
 =head1 NAME
 
@@ -19,7 +19,7 @@ Wx::Perl::ProcessStream - access IO of external processes via events
 
 =head1 VERSION
 
-Version 0.26
+Version 0.27
 
 =head1 SYNOPSYS
 
@@ -469,7 +469,7 @@ if( Wx::wxVERSION() < 2.0060025) {
 #-----------------------------------------------------
 
 our ($ID_CMD_EXIT, $ID_CMD_STDOUT, $ID_CMD_STDERR, $ID_CMD_MAXLINES,
-     $WXP_DEFAULT_CLOSE_ACTION, $WXP_DEFAULT_MAX_LINES, $WXPDEBUG);
+     $WXP_DEFAULT_CLOSE_ACTION, $WXP_DEFAULT_MAX_LINES, $WXPDEBUG, $WX_YIELD_EXTENDED);
 
 $ID_CMD_EXIT   = Wx::NewEventType();
 $ID_CMD_STDOUT = Wx::NewEventType();
@@ -509,6 +509,20 @@ sub EVT_WXP_PROCESS_STREAM_STDOUT   ($$) { $_[0]->Connect(-1,-1,&wxpEVT_PROCESS_
 sub EVT_WXP_PROCESS_STREAM_STDERR   ($$) { $_[0]->Connect(-1,-1,&wxpEVT_PROCESS_STREAM_STDERR, $_[1] ) };
 sub EVT_WXP_PROCESS_STREAM_EXIT     ($$) { $_[0]->Connect(-1,-1,&wxpEVT_PROCESS_STREAM_EXIT,   $_[1] ) };
 sub EVT_WXP_PROCESS_STREAM_MAXLINES ($$) { $_[0]->Connect(-1,-1,&wxpEVT_PROCESS_STREAM_MAXLINES,   $_[1] ) };
+
+sub Yield {
+    if(defined($WX_YIELD_EXTENDED)) {
+        ($WX_YIELD_EXTENDED) ? Wx::wxTheApp->Yield(1) : Wx::wxTheApp->Yield();
+    } else {
+        eval { Wx::TheApp->Yield(1); };
+        if($@) {
+            $WX_YIELD_EXTENDED = 0;
+            Wx::wxTheApp->Yield();
+        } else {
+            $WX_YIELD_EXTENDED = 1;
+        }
+    }
+}
 
 # Old interface - call Wx::Perl::ProcessStream::new
 
@@ -690,7 +704,7 @@ sub Notify {
         # we will not exit this outer loop until $continueprocessloop == 0
         #-----------------------------------------------------------------
         
-        Wx::wxTheApp->Yield();
+        Wx::Perl::ProcessStream::Yield();
                 
     } # while( $continueprocessloop ) {
     
@@ -1001,7 +1015,7 @@ sub IsAlive {
 
 sub Destroy {
     my $self = shift;
-    Wx::Process::Kill($self->GetPid(), wxSIGKILL) if $self->IsAlive; # this will force us to wait for exit if we have received exit event
+    Wx::Process::Kill($self->GetPid(), wxSIGKILL) if $self->IsAlive; 
     $Wx::Perl::ProcessStream::ProcHandler->RemoveProc( $self );
     $self->SUPER::Destroy;
     $self = undef;

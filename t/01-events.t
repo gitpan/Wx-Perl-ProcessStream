@@ -14,7 +14,7 @@ $app->MainLoop;
 package ProcessStreamTestingFrame;
 use strict;
 use base qw(WxTesting::Frame);
-use Wx::Perl::ProcessStream 0.26 qw( :everything );
+use Wx::Perl::ProcessStream 0.27 qw( :everything );
 use Test::More;
 use Time::HiRes qw( sleep );
 
@@ -66,12 +66,12 @@ sub RunTests {
         $process = undef;
     }
     
-    
     if($^O =~ /^MSWin/) {
         $cmd = [ $perl, '-e', q("print 'HELLO WORLD', qq(\n);") ];
     } else {
         $cmd = [ $perl, '-e', q(print 'HELLO WORLD', qq(\n);) ];
     }
+    
     {
         $process = $self->start_process_a( $cmd );
         ok( $process->IsAlive() );
@@ -212,7 +212,7 @@ sub RunTests {
             $process->WriteProcess(qq(WX TEST DATA\n));
             $process->CloseInput();
         }
-        Wx::wxTheApp->Yield();
+        Wx::Perl::ProcessStream::Yield();
     }
     
     is( $process->IsAlive(), 0 );
@@ -249,7 +249,7 @@ sub RunTests {
             foreach my $mpid (sort keys( %{ $self->{_multiresult} } ) ) {
                 $stillrunning ++ if(!defined($self->{_multiresult}->{$mpid}->{received}));
             }
-            Wx::wxTheApp->Yield();
+            Wx::Perl::ProcessStream::Yield();
         }
     }
     for( @multiprocs ) {
@@ -338,7 +338,7 @@ sub start_process_b {
 sub wait_for_test_complete {
     my $self = shift;
     while(!defined($self->{_exitcode})) {
-        Wx::wxTheApp->Yield();
+        Wx::Perl::ProcessStream::Yield();
         sleep 0.1;
     }
 }
@@ -380,7 +380,5 @@ sub evt_process {
         }
     }
 }
-
-
 
 1;

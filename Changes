@@ -1,5 +1,10 @@
 Revision history for Wx-Perl-ProcessStream
 
+0.27    2010-02-28 00:00
+        Use param to Wx::Yield (Wx 0.9701+) to avoid recursive
+        Yield calls and pass tests with debugging wxWidgets
+        (e.g. pre-installed wxWidgets on OSX);
+
 0.26    2010-02-26 00:00
         Changed behaviour of $process->IsAlive
         will now return false if process has
