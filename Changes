@@ -1,5 +1,9 @@
 Revision history for Wx-Perl-ProcessStream
 
+0.28    2010-09-17 00:00
+        Use function Wx::YieldIfNeeded so now no need for Wx
+        > 0.97
+
 0.27    2010-02-28 00:00
         Use param to Wx::Yield (Wx 0.9701+) to avoid recursive
         Yield calls and pass tests with debugging wxWidgets
