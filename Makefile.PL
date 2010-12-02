@@ -1,6 +1,5 @@
 use strict;
 use warnings;
-use Archive::Tar;
 use ExtUtils::MakeMaker;
 
 my $build_requires = { 

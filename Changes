@@ -1,5 +1,8 @@
 Revision history for Wx-Perl-ProcessStream
 
+0.29    2010-12-02 00:00
+        Makefile changes only - remove Archive::Tar dependency
+
 0.28    2010-09-17 00:00
         Use function Wx::YieldIfNeeded so now no need for Wx
         > 0.97
