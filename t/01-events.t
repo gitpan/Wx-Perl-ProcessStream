@@ -3,7 +3,7 @@ BEGIN { $ENV{WXPPS_MULTITEST} ||= 10; $ENV{WXPPS_POLLINTERVAL} ||= 100;}
 package main;
 
 use strict;
-use Test::More tests => 68 + $ENV{WXPPS_MULTITEST};
+use Test::More tests => 57 + $ENV{WXPPS_MULTITEST};
 use lib 't';
 use Wx;
 use WxTesting qw( app_from_wxtesting_frame );
@@ -14,7 +14,7 @@ $app->MainLoop;
 package ProcessStreamTestingFrame;
 use strict;
 use base qw(WxTesting::Frame);
-use Wx::Perl::ProcessStream 0.27 qw( :everything );
+use Wx::Perl::ProcessStream 0.30 qw( :everything );
 use Test::More;
 use Time::HiRes qw( sleep );
 
@@ -53,7 +53,7 @@ sub RunTests {
     
     {
         $process = $self->start_process_a( $cmd );
-        ok( $process->IsAlive() );
+        #ok( $process->IsAlive() );
         $self->wait_for_test_complete();
         is( $process->IsAlive(), 0 );
         is( $self->{_stdout}->[0], '0' );
@@ -74,7 +74,7 @@ sub RunTests {
     
     {
         $process = $self->start_process_a( $cmd );
-        ok( $process->IsAlive() );
+        #ok( $process->IsAlive() );
         $self->wait_for_test_complete();
         is( $process->IsAlive(), 0 );
         is( $self->{_stdout}->[0], 'HELLO WORLD' );
@@ -88,7 +88,7 @@ sub RunTests {
     }
     {
         $process = $self->start_process_b( $cmd );
-        ok( $process->IsAlive() );
+        #ok( $process->IsAlive() );
         $self->wait_for_test_complete();
         is( $process->IsAlive(), 0 );
         is( $self->{_stdout}->[0], 'HELLO WORLD' );
@@ -111,7 +111,7 @@ sub RunTests {
     
     {
         $process = $self->start_process_a( $cmd );
-        ok( $process->IsAlive() );
+        #ok( $process->IsAlive() );
         $self->wait_for_test_complete();
         is( $process->IsAlive(), 0 );
         is( $self->{_stdout}->[0], 'HELLO WORLD' );
@@ -125,7 +125,7 @@ sub RunTests {
     }
     {
         $process = $self->start_process_b( $cmd );
-        ok( $process->IsAlive() );
+        #ok( $process->IsAlive() );
         $self->wait_for_test_complete();
         is( $process->IsAlive(), 0 );
         is( $self->{_stdout}->[0], 'HELLO WORLD' );
@@ -141,7 +141,7 @@ sub RunTests {
     # test group 2
     $cmd = $perl . ' notarealtestascript.pl';
     $process = $self->start_process_b( $cmd );
-    ok( $process->IsAlive() );
+    #ok( $process->IsAlive() );
     $self->wait_for_test_complete();
     is( $process->IsAlive(), 0 );
     my $out = join('', @{ $self->{_stdout} });
@@ -161,7 +161,7 @@ sub RunTests {
         $cmd = [ $perl, '-e', q($|=1;print 'ONE', qq(\n);sleep 1;print 'TWO', qq(\n);sleep 1;print 'THREE',qq(\n);sleep 1;print STDERR 'FOUR', qq(\n);exit(5);) ];
     }
     $process = $self->start_process_b( $cmd );
-    ok( $process->IsAlive() );
+    #ok( $process->IsAlive() );
     $self->wait_for_test_complete();
     is( $process->IsAlive(), 0 );
     my $bufferline = join('-', @{ $self->{_stdout } });
@@ -179,7 +179,7 @@ sub RunTests {
     # test group 4 - write STDIN
     $cmd = $perl . ' t/echo.pl';
     $process = $self->start_process_b( $cmd );
-    ok( $process->IsAlive() );
+    #ok( $process->IsAlive() );
     
     $process->WriteProcess( qq(TEST STDIN 1\n) );
     $process->WriteProcess( qq(TEST STDIN 2\n) );
@@ -205,7 +205,7 @@ sub RunTests {
     }
 
     $process = $self->start_process_b( $cmd );
-    ok( $process->IsAlive() );
+    #ok( $process->IsAlive() );
 
     while(!defined($self->{_exitcode})) {
         if(join('-', @{ $process->GetStdOutBuffer() }) eq 'WXTEST INPUT') {
@@ -279,7 +279,7 @@ sub RunTests {
         }
         $self->{_maxlineevtcount} = 0;
         $process = $self->start_process_b( $cmd );
-        ok( $process->IsAlive() );
+        #ok( $process->IsAlive() );
         $self->wait_for_test_complete();
         is( $process->IsAlive(), 0 );
         is( $self->{_stdout}->[0], 1200 );
@@ -297,7 +297,7 @@ sub RunTests {
         $self->{_maxlineevtcount} = 0;
         
         $process = $self->start_process_b( $cmd );
-        ok( $process->IsAlive() );
+        #ok( $process->IsAlive() );
         $self->wait_for_test_complete();
         is( $process->IsAlive(), 0 );
         is( $self->{_stdout}->[0], 1200 );
