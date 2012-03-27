@@ -46,7 +46,7 @@ sub RunTests {
     my $errs;
     
     if($^O =~ /^MSWin/) {
-        $cmd = [ $perl, '-e', q("print 0, qq(\n);") ];
+        $cmd = [ $perl, '-e', q(print 0, qq(\n);) ];
     } else {
         $cmd = [ $perl, '-e', q(print 0, qq(\n);) ];
     }
@@ -67,7 +67,7 @@ sub RunTests {
     }
     
     if($^O =~ /^MSWin/) {
-        $cmd = [ $perl, '-e', q("print 'HELLO WORLD', qq(\n);") ];
+        $cmd = [ $perl, '-e', q(print 'HELLO WORLD', qq(\n);) ];
     } else {
         $cmd = [ $perl, '-e', q(print 'HELLO WORLD', qq(\n);) ];
     }
@@ -104,7 +104,7 @@ sub RunTests {
     # test group 1a - arrref
     
     if($^O =~ /^MSWin/) {
-        $cmd = [ $perl, '-e', q("print 'HELLO WORLD', qq(\n);") ];
+        $cmd = [ $perl, '-e', q(print 'HELLO WORLD', qq(\n);) ];
     } else {
         $cmd = [ $perl, '-e', q(print 'HELLO WORLD', qq(\n);) ];
     }
@@ -156,7 +156,7 @@ sub RunTests {
     
     # test group 3
     if($^O =~ /^MSWin/) {
-        $cmd = [ $perl, '-e', q("$|=1;print 'ONE', qq(\n);sleep 1;print 'TWO', qq(\n);sleep 1;print 'THREE',qq(\n);sleep 1;print STDERR 'FOUR', qq(\n);exit(5);") ];
+        $cmd = [ $perl, '-e', q($|=1;print 'ONE', qq(\n);sleep 1;print 'TWO', qq(\n);sleep 1;print 'THREE',qq(\n);sleep 1;print STDERR 'FOUR', qq(\n);exit(5);) ];
     } else {
         $cmd = [ $perl, '-e', q($|=1;print 'ONE', qq(\n);sleep 1;print 'TWO', qq(\n);sleep 1;print 'THREE',qq(\n);sleep 1;print STDERR 'FOUR', qq(\n);exit(5);) ];
     }
@@ -273,7 +273,7 @@ sub RunTests {
         $self->{_eventmode} = 'single';
         
         if($^O =~ /^MSWin/) {
-            $cmd = [ $perl, '-e', q("$x = 1200; while($x){ print qq($x\n); $x--; };") ];
+            $cmd = [ $perl, '-e', q($x = 1200; while($x){ print qq($x\n); $x--; };) ];
         } else {
             $cmd = [ $perl, '-e', q($x = 1200; while($x){ print qq($x\n); $x--; };) ];
         }

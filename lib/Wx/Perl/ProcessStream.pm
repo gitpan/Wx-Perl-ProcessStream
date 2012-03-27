@@ -11,7 +11,7 @@
 
 package Wx::Perl::ProcessStream;
 
-our $VERSION = '0.30';
+our $VERSION = '0.31';
 
 =head1 NAME
 
@@ -19,7 +19,7 @@ Wx::Perl::ProcessStream - access IO of external processes via events
 
 =head1 VERSION
 
-Version 0.29
+Version 0.31
 
 =head1 SYNOPSYS
 
@@ -510,20 +510,7 @@ sub EVT_WXP_PROCESS_STREAM_STDERR   ($$) { $_[0]->Connect(-1,-1,&wxpEVT_PROCESS_
 sub EVT_WXP_PROCESS_STREAM_EXIT     ($$) { $_[0]->Connect(-1,-1,&wxpEVT_PROCESS_STREAM_EXIT,   $_[1] ) };
 sub EVT_WXP_PROCESS_STREAM_MAXLINES ($$) { $_[0]->Connect(-1,-1,&wxpEVT_PROCESS_STREAM_MAXLINES,   $_[1] ) };
 
-sub Yield {
-    #if(defined($WX_YIELD_EXTENDED)) {
-    #    ($WX_YIELD_EXTENDED) ? Wx::wxTheApp->Yield(1) : Wx::wxTheApp->Yield();
-    #} else {
-    #    eval { Wx::TheApp->Yield(1); };
-    #    if($@) {
-    #        $WX_YIELD_EXTENDED = 0;
-    #        Wx::wxTheApp->Yield();
-    #    } else {
-    #        $WX_YIELD_EXTENDED = 1;
-    #    }
-    #}
-    Wx::YieldIfNeeded;
-}
+sub Yield { Wx::YieldIfNeeded; }
 
 # Old interface - call Wx::Perl::ProcessStream::new
 
@@ -823,11 +810,11 @@ sub new {
 sub Run {
     my $self = shift;
     
-    my $command = $self->{_arg_command};
-    
-    my $procid = (ref $command eq 'ARRAY') 
-        ? Wx::ExecuteArgs   ( $command, wxEXEC_ASYNC, $self )
-        : Wx::ExecuteCommand( $command, wxEXEC_ASYNC, $self );
+	my $command = $self->{_arg_command};
+	
+	my $procid = (ref $command eq 'ARRAY') 
+	    ? Wx::ExecuteArgs   ( $command, wxEXEC_ASYNC, $self )
+	    : Wx::ExecuteCommand( $command, wxEXEC_ASYNC, $self );
         
     if($procid) {
         $self->__set_process_id( $procid );
@@ -848,12 +835,12 @@ sub __read_input_line {
     my $charbuffer = '0';
     use bytes;
     if($self->{_readlineon}) {
-        #print qq(readline method used for pid: ) . $self->GetPid . qq(\n) if($Wx::Perl::ProcessStream::WXPDEBUG);
+        print qq(readline method used for pid: ) . $self->GetPid . qq(\n) if($Wx::Perl::ProcessStream::WXPDEBUG);
         if( $self->IsInputAvailable() && defined( my $tempbuffer = readline( $self->GetInputStream() ) ) ){
             $linebuffer = $tempbuffer;
         }        
     } else {
-        #print qq(read method used for pid: ) . $self->GetPid . qq(\n) if($Wx::Perl::ProcessStream::WXPDEBUG);
+        print qq(read method used for pid: ) . $self->GetPid . qq(\n) if($Wx::Perl::ProcessStream::WXPDEBUG);
         while( $self->IsInputAvailable() && ( my $chars = read($self->GetInputStream(),$charbuffer,1 ) ) ) {
             last if(!$chars);
             $linebuffer .= $charbuffer;
@@ -870,12 +857,12 @@ sub __read_error_line {
     my $charbuffer = '0';
     use bytes;
     if($self->{_readlineon}) {
-        #print qq(readline method used for pid: ) . $self->GetPid . qq(\n) if($Wx::Perl::ProcessStream::WXPDEBUG);
+        print qq(readline method used for pid: ) . $self->GetPid . qq(\n) if($Wx::Perl::ProcessStream::WXPDEBUG);
         if( $self->IsErrorAvailable() && defined( my $tempbuffer = readline( $self->GetErrorStream() ) ) ){
             $linebuffer = $tempbuffer;
         }
     } else {
-        #print qq(read method used for pid: ) . $self->GetPid . qq(\n) if($Wx::Perl::ProcessStream::WXPDEBUG);
+        print qq(read method used for pid: ) . $self->GetPid . qq(\n) if($Wx::Perl::ProcessStream::WXPDEBUG);
         while($self->IsErrorAvailable() && ( my $chars = read($self->GetErrorStream(),$charbuffer,1 ) ) ) {
             last if(!$chars);
             $linebuffer .= $charbuffer;

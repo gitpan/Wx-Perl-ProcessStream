@@ -16,7 +16,7 @@ WriteMakefile(
     VERSION_FROM        => 'lib/Wx/Perl/ProcessStream.pm',
     PL_FILES            => {},
     PREREQ_PM           => { %$build_requires },
-    dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', TAR => $tarprog, TARFLAGS => "cvf" },
+    dist                => { COMPRESS => 'gzip -9f', SUFFIX => '.gz', TAR => $tarprog, TARFLAGS => "cvf" },
     clean               => { FILES => 'Wx-Perl-ProcessStream-*' },
     
 );
