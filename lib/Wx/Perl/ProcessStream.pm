@@ -11,7 +11,7 @@
 
 package Wx::Perl::ProcessStream;
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 =head1 NAME
 
@@ -19,7 +19,7 @@ Wx::Perl::ProcessStream - access IO of external processes via events
 
 =head1 VERSION
 
-Version 0.31
+Version 0.32
 
 =head1 SYNOPSYS
 
@@ -596,6 +596,7 @@ sub Notify {
     $self->{_notify_in_progress} = 1;
     
     my $continueprocessloop = 1;
+    my $eventscreated = 0;
     
     while( $continueprocessloop  ) {
     
@@ -635,7 +636,6 @@ sub Notify {
             if(!$process->_exit_event_posted) {
             
                 # STDERR
-                
                 while( ( my $linebuffer = $process->__read_error_line ) ){
                     $continueprocessloop ++;
                     $linedataread ++;
@@ -645,6 +645,7 @@ sub Notify {
                     $event->SetLine( $linebuffer );
                     $event->SetProcess( $process );
                     $process->__get_handler()->AddPendingEvent($event);
+                    $eventscreated ++;
                     last if $linedataread == $maxlinecount;
                 }
 
@@ -660,10 +661,10 @@ sub Notify {
                         $event->SetLine( $linebuffer );
                         $event->SetProcess( $process );
                         $process->__get_handler()->AddPendingEvent($event);
+                        $eventscreated ++;
                         last if $linedataread == $maxlinecount;
                     }
                 }
-                
             }
             
             if(defined($procexitcode) && !$linedataread) {
@@ -674,6 +675,7 @@ sub Notify {
                 $event->SetLine( undef );
                 $event->SetProcess( $process );
                 $process->__get_handler()->AddPendingEvent($event);
+                $eventscreated ++;
             }
             
             # raise the maxline event if required
@@ -683,6 +685,7 @@ sub Notify {
                 $event->SetLine( undef );
                 $event->SetProcess( $process );
                 $process->__get_handler()->AddPendingEvent($event);
+                $eventscreated ++;
             }
             
         } # for my $process (@checkprocs) {
@@ -690,12 +693,17 @@ sub Notify {
         #-----------------------------------------------------------------
         # yield to allow changes to $self->{_procs}
         # we will not exit this outer loop until $continueprocessloop == 0
+        # events we have raised may not get processed in this Yield
+        # Taht may not happen until the outer ->ProcessPendingEvents
         #-----------------------------------------------------------------
         
         Wx::Perl::ProcessStream::Yield();
                 
     } # while( $continueprocessloop ) {
-    
+    # ProcessPendingEvents happens once per eventloop
+    # Below seems to improve response AND is necessary
+    # in some cases
+    Wx::wxTheApp->ProcessPendingEvents if $eventscreated;
     $self->{_notify_in_progress} = 0;
     $self->Stop() unless( $self->ProcessCount  );
     return 1;
